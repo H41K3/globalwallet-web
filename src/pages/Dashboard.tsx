@@ -5,7 +5,7 @@ import axios from "axios";
 // Importando a logo .png limpa
 import logoImg from "../assets/logo.jpeg";
 
-// --- DICIONÁRIOS ---
+// --- DICIONÁRIOS ATUALIZADOS COM TERMOS DO EXTRATO E MESES ---
 const translations = {
   pt: {
     flag: "🇧🇷",
@@ -40,6 +40,25 @@ const translations = {
     confirmDelete: "Excluir transação?",
     errorValue: "Valor inválido.",
     selCategory: "Categoria",
+    entries: "Entradas",
+    exits: "Saídas",
+    balanceTotal: "Balanço",
+    periodTransactions: "Transações do Período",
+    noTransactionsMonth: "Nenhuma transação encontrada neste mês.",
+    months: [
+      "Janeiro",
+      "Fevereiro",
+      "Março",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro",
+    ],
   },
   en: {
     flag: "🇺🇸",
@@ -74,6 +93,25 @@ const translations = {
     confirmDelete: "Delete transaction?",
     errorValue: "Invalid value.",
     selCategory: "Category",
+    entries: "Incomes",
+    exits: "Expenses",
+    balanceTotal: "Balance",
+    periodTransactions: "Period Transactions",
+    noTransactionsMonth: "No transactions found this month.",
+    months: [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ],
   },
   es: {
     flag: "🇪🇸",
@@ -108,6 +146,25 @@ const translations = {
     confirmDelete: "¿Eliminar?",
     errorValue: "Valor inválido.",
     selCategory: "Categoría",
+    entries: "Ingresos",
+    exits: "Gastos",
+    balanceTotal: "Balance",
+    periodTransactions: "Transacciones del Período",
+    noTransactionsMonth: "No se encontraron transacciones este mes.",
+    months: [
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+    ],
   },
   fr: {
     flag: "🇫🇷",
@@ -142,6 +199,25 @@ const translations = {
     confirmDelete: "Supprimer?",
     errorValue: "Valeur invalide.",
     selCategory: "Catégorie",
+    entries: "Revenus",
+    exits: "Dépenses",
+    balanceTotal: "Bilan",
+    periodTransactions: "Transactions de la Période",
+    noTransactionsMonth: "Aucune transaction trouvée ce mois-ci.",
+    months: [
+      "Janvier",
+      "Février",
+      "Mars",
+      "Avril",
+      "Mai",
+      "Juin",
+      "Juillet",
+      "Août",
+      "Septembre",
+      "Octobre",
+      "Novembre",
+      "Décembre",
+    ],
   },
   de: {
     flag: "🇩🇪",
@@ -176,6 +252,25 @@ const translations = {
     confirmDelete: "Löschen?",
     errorValue: "Ungültiger Wert.",
     selCategory: "Kategorie",
+    entries: "Einnahmen",
+    exits: "Ausgaben",
+    balanceTotal: "Bilanz",
+    periodTransactions: "Transaktionen im Zeitraum",
+    noTransactionsMonth: "In diesem Monat wurden keine Transaktionen gefunden.",
+    months: [
+      "Januar",
+      "Februar",
+      "März",
+      "April",
+      "Mai",
+      "Juni",
+      "Juli",
+      "August",
+      "September",
+      "Oktober",
+      "November",
+      "Dezember",
+    ],
   },
   it: {
     flag: "🇮🇹",
@@ -199,7 +294,7 @@ const translations = {
     welcome: "Ciao",
     logout: "Esci",
     balance: "Saldo Disponibile",
-    newTransaction: "Nuova Transação",
+    newTransaction: "Nuova Transazione",
     income: "Entrata",
     expense: "Uscita",
     descPlaceholder: "Descrizione (es: Mercato)",
@@ -210,6 +305,25 @@ const translations = {
     confirmDelete: "Eliminare?",
     errorValue: "Valore non valido.",
     selCategory: "Categoria",
+    entries: "Entrate",
+    exits: "Uscite",
+    balanceTotal: "Bilancio",
+    periodTransactions: "Transazioni del Periodo",
+    noTransactionsMonth: "Nessuna transazione trovata in questo mese.",
+    months: [
+      "Gennaio",
+      "Febbraio",
+      "Marzo",
+      "Aprile",
+      "Maggio",
+      "Giugno",
+      "Luglio",
+      "Agosto",
+      "Settembre",
+      "Ottobre",
+      "Novembre",
+      "Dicembre",
+    ],
   },
   ja: {
     flag: "🇯🇵",
@@ -244,6 +358,25 @@ const translations = {
     confirmDelete: "削除しますか？",
     errorValue: "無効な値です。",
     selCategory: "カテゴリ",
+    entries: "収入",
+    exits: "支出",
+    balanceTotal: "残高",
+    periodTransactions: "期間の取引",
+    noTransactionsMonth: "今月の取引は見つかりませんでした。",
+    months: [
+      "1月",
+      "2月",
+      "3月",
+      "4月",
+      "5月",
+      "6月",
+      "7月",
+      "8月",
+      "9月",
+      "10月",
+      "11月",
+      "12月",
+    ],
   },
   zh: {
     flag: "🇨🇳",
@@ -278,6 +411,25 @@ const translations = {
     confirmDelete: "删除交易？",
     errorValue: "无效值。",
     selCategory: "类别",
+    entries: "收入",
+    exits: "支出",
+    balanceTotal: "余额",
+    periodTransactions: "期间交易",
+    noTransactionsMonth: "本月未找到交易。",
+    months: [
+      "一月",
+      "二月",
+      "三月",
+      "四月",
+      "五月",
+      "六月",
+      "七月",
+      "八月",
+      "九月",
+      "十月",
+      "十一月",
+      "十二月",
+    ],
   },
   ko: {
     flag: "🇰🇷",
@@ -312,6 +464,25 @@ const translations = {
     confirmDelete: "삭제하시겠습니까?",
     errorValue: "잘못된 값입니다.",
     selCategory: "카테고리",
+    entries: "수입",
+    exits: "지출",
+    balanceTotal: "잔액",
+    periodTransactions: "기간 거래",
+    noTransactionsMonth: "이번 달에 거래가 없습니다.",
+    months: [
+      "1월",
+      "2월",
+      "3월",
+      "4월",
+      "5월",
+      "6월",
+      "7월",
+      "8월",
+      "9월",
+      "10월",
+      "11월",
+      "12월",
+    ],
   },
 };
 
@@ -487,6 +658,49 @@ export function Dashboard() {
   );
   const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
   const nomeUsuario = localStorage.getItem("usuario") || "haike_dev";
+
+  // --- LÓGICA DO EXTRATO DETALHADO (FILTROS) ---
+  const dataAtual = new Date();
+  const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
+  const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
+
+  // Funções para controle das setas do Extrato Detalhado
+  const handleMesAnterior = () => {
+    if (mesFiltro === 1) {
+      setMesFiltro(12);
+      setAnoFiltro(anoFiltro - 1);
+    } else {
+      setMesFiltro(mesFiltro - 1);
+    }
+  };
+
+  const handleMesSeguinte = () => {
+    if (mesFiltro === 12) {
+      setMesFiltro(1);
+      setAnoFiltro(anoFiltro + 1);
+    } else {
+      setMesFiltro(mesFiltro + 1);
+    }
+  };
+
+  const transacoesFiltradas = transacoes.filter((t) => {
+    if (!t.transactionDate) return false;
+    const [anoStr, mesStr] = t.transactionDate.split("-");
+    return (
+      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
+    );
+  });
+
+  const totalEntradasMes = transacoesFiltradas
+    .filter((t) => t.type === "INCOME")
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+  const totalSaidasMes = transacoesFiltradas
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+  const saldoMes = totalEntradasMes - totalSaidasMes;
+  // ----------------------------------------------
 
   const buscarTudo = async () => {
     const token = localStorage.getItem("token");
@@ -791,7 +1005,7 @@ export function Dashboard() {
     <div
       style={{
         backgroundColor: "#fff",
-        borderRadius: "10px", // Borda um pouco mais arredondada para o tamanho maior
+        borderRadius: "10px",
         width: `${size}px`,
         height: `${size}px`,
         display: "flex",
@@ -804,7 +1018,12 @@ export function Dashboard() {
       <img
         src={logoImg}
         alt="Logo"
-        style={{ height: "100%", width: "100%", objectFit: "cover", transform: "scale(1.3)" }} // Pequeno zoom para preencher melhor o espaço
+        style={{
+          height: "100%",
+          width: "100%",
+          objectFit: "cover",
+          transform: "scale(1.3)",
+        }}
       />
     </div>
   );
@@ -877,8 +1096,8 @@ export function Dashboard() {
         style={{
           position: "fixed",
           top: 0,
-          left: menuAberto ? 0 : "-280px",
-          width: "280px",
+          left: menuAberto ? 0 : "-308px",
+          width: "308px",
           height: "100vh",
           backgroundColor: "#fff",
           boxShadow: "2px 0 10px rgba(0,0,0,0.1)",
@@ -931,18 +1150,18 @@ export function Dashboard() {
         </ul>
       </div>
 
-      {/* --- CABEÇALHO PRINCIPAL (HEADER) - ATUALIZADO (IGUAL FLANEWS) --- */}
+      {/* --- CABEÇALHO PRINCIPAL (HEADER) --- */}
       <header
         style={{
           backgroundColor: "#EC0000",
           color: "white",
-          padding: "0 1.5rem", // Padding vertical removido para grudar no topo
-          height: "75px",
+          padding: "0 1.5rem",
+          height: "80px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderRadius: "0 0 22px 22px", // Arredonda apenas embaixo
-          boxShadow: "0 8px 20px rgba(100, 98, 98, 0.35)", // Sombreado estilo FlaNews
+          borderRadius: "0 0 22px 22px",
+          boxShadow: "0 8px 20px rgba(100, 98, 98, 0.35)",
           marginBottom: "2rem",
           position: "relative",
           zIndex: 10,
@@ -957,7 +1176,7 @@ export function Dashboard() {
             height: "100%",
           }}
         >
-          {/* Três tracinhos PRIMEIRO - TAMANHO AUMENTADO */}
+          {/* Três tracinhos PRIMEIRO */}
           <button
             onClick={() => setMenuAberto(true)}
             style={{
@@ -975,7 +1194,7 @@ export function Dashboard() {
             ☰
           </button>
 
-          {/* Logo e Nome LOGO DEPOIS - TAMANHO AUMENTADO */}
+          {/* Logo e Nome LOGO DEPOIS */}
           <div
             onClick={() => window.location.reload()}
             style={{
@@ -986,7 +1205,8 @@ export function Dashboard() {
               height: "100%",
             }}
           >
-            <AppLogo size={45} />
+            <AppLogo size={40} />
+
             <h2
               style={{
                 margin: 0,
@@ -1000,7 +1220,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Lado Direito: Idiomas e User - TAMANHO AUMENTADO */}
+        {/* Lado Direito: Idiomas e User */}
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
           <div ref={menuIdiomaRef} style={{ position: "relative" }}>
             <button
@@ -1650,21 +1870,377 @@ export function Dashboard() {
         {/* --- ABA EXTRATO DETALHADO --- */}
         {abaAtiva === "statement" && (
           <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "3rem 2rem",
-              borderRadius: "16px",
-              textAlign: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            }}
+            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            <h2 style={{ color: "#333", marginBottom: "10px" }}>
-              📊 {t.statement}
-            </h2>
-            <p style={{ color: "#777", maxWidth: "400px", margin: "0 auto" }}>
-              Aqui vamos construir um extrato avançado, com filtros por mês, por
-              categoria e opção de exportar para PDF ou Excel!
-            </p>
+            {/* CONTROLES DE FILTRO */}
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "1.5rem 2rem",
+                borderRadius: "16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+                📊 {t.statement}
+              </h2>
+
+              {/* FILTRO MODERNO COM SETAS */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  backgroundColor: "#f9fafb",
+                  borderRadius: "12px",
+                  padding: "4px",
+                  border: "1px solid #eaeaea",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
+                }}
+              >
+                <button
+                  onClick={handleMesAnterior}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px 12px",
+                    fontSize: "1.1rem",
+                    color: "#555",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.2s",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#eee")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
+                >
+                  ❮
+                </button>
+
+                <div
+                  style={{
+                    minWidth: "140px",
+                    textAlign: "center",
+                    fontWeight: "600",
+                    color: "#333",
+                    fontSize: "1rem",
+                    userSelect: "none",
+                  }}
+                >
+                  {t.months[mesFiltro - 1]} {anoFiltro}
+                </div>
+
+                <button
+                  onClick={handleMesSeguinte}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px 12px",
+                    fontSize: "1.1rem",
+                    color: "#555",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.2s",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#eee")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
+                >
+                  ❯
+                </button>
+              </div>
+            </div>
+
+            {/* CARDS DE RESUMO */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "15px",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: "4px solid #107c10",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.entries}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: "#107c10",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(totalEntradasMes).simbolo}
+                  </span>
+                  {getValorExibicao(totalEntradasMes).valorFormatado}
+                </h3>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: "4px solid #EC0000",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.exits}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: "#EC0000",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(totalSaidasMes).simbolo}
+                  </span>
+                  {getValorExibicao(totalSaidasMes).valorFormatado}
+                </h3>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: `4px solid ${saldoMes >= 0 ? "#107c10" : "#EC0000"}`,
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.balanceTotal}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: saldoMes >= 0 ? "#107c10" : "#EC0000",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(saldoMes).simbolo}
+                  </span>
+                  {getValorExibicao(saldoMes).valorFormatado}
+                </h3>
+              </div>
+            </div>
+
+            {/* TABELA DE TRANSAÇÕES FILTRADAS */}
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "1.5rem",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 15px 0",
+                  color: "#333",
+                  fontSize: "1.1rem",
+                  fontWeight: "600",
+                }}
+              >
+                {t.periodTransactions}
+              </h3>
+
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {transacoesFiltradas.map((t_row, i) => {
+                    const isExpense = t_row.type === "EXPENSE";
+                    const valorAbsoluto = Math.abs(t_row.amount || 0);
+                    const infoExibicao = getValorExibicao(valorAbsoluto);
+
+                    const categoriaVisual =
+                      categoryMap[t_row.category || "OTHER"] ||
+                      categoryMap["OTHER"];
+                    const nomeCategoriaTraduzido = categoriaVisual[
+                      idioma as keyof typeof categoriaVisual
+                    ] as string;
+
+                    const isOutros =
+                      !t_row.category || t_row.category === "OTHER";
+                    const corDeFundoIcone = isOutros
+                      ? isExpense
+                        ? "#ffebee"
+                        : "#e8f5e9"
+                      : categoriaVisual.bgColor;
+
+                    return (
+                      <tr
+                        key={t_row.id || i}
+                        style={{ borderBottom: "1px solid #f5f5f5" }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "15px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "10px",
+                              backgroundColor: corDeFundoIcone,
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              fontSize: "1.2rem",
+                            }}
+                            title={nomeCategoriaTraduzido}
+                          >
+                            {categoriaVisual.emoji}
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: "500",
+                                color: "#333",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              {t_row.description}
+                            </div>
+                            <div
+                              style={{
+                                color: "#aaa",
+                                fontSize: "0.75rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: isExpense ? "#EC0000" : "#107c10",
+                                  fontWeight: "bold",
+                                  marginRight: "6px",
+                                }}
+                              >
+                                {nomeCategoriaTraduzido}
+                              </span>
+                              • {formatarDataLocal(t_row.transactionDate)}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "14px 0", textAlign: "right" }}>
+                          <div
+                            style={{
+                              fontWeight: "600",
+                              color: isExpense ? "#EC0000" : "#107c10",
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {isExpense ? "- " : "+ "}
+                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                          </div>
+                        </td>
+                        <td style={{ width: "40px", textAlign: "right" }}>
+                          <button
+                            onClick={() => handleDeleteTransaction(t_row.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ccc",
+                              cursor: "pointer",
+                              fontSize: "1.2rem",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {transacoesFiltradas.length === 0 && (
+                <div style={{ textAlign: "center", padding: "40px 0" }}>
+                  <span style={{ fontSize: "2rem" }}>📭</span>
+                  <p
+                    style={{
+                      color: "#999",
+                      fontSize: "0.95rem",
+                      marginTop: "10px",
+                    }}
+                  >
+                    {t.noTransactionsMonth}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
