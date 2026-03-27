@@ -2,10 +2,1993 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-// Importando a logo .png limpa
 import logoImg from "../assets/logo.jpeg";
 
-// --- DICIONÁRIOS ATUALIZADOS COM TERMOS DO EXTRATO E MESES ---
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+type AbaType = "home" | "statement" | "cards" | "settings";
+
+interface Transacao {
+  id?: number;
+  description?: string;
+  amount?: number;
+  transactionDate?: string;
+  type?: string;
+  category?: string;
+}
+
+interface Cartao {
+  id: number;
+  nome: string;
+  final: string;
+  limite: number;
+  faturaAtual: number;
+  cor: string;
+}
+
+export function Dashboard() {
+  const navigate = useNavigate();
+
+  // ==========================================
+  // 1. ESTADOS GLOBAIS
+  // ==========================================
+  const [abaAtiva, setAbaAtiva] = useState<AbaType>(
+    (localStorage.getItem("abaAtiva") as AbaType) || "home",
+  );
+  const [idioma, setIdioma] = useState<IdiomaType>(
+    (localStorage.getItem("idioma") as IdiomaType) || "pt",
+  );
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [menuIdiomaAberto, setMenuIdiomaAberto] = useState(false);
+  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">(
+    "BRL",
+  );
+  const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
+
+  const menuIdiomaRef = useRef<HTMLDivElement>(null);
+  const nomeUsuario = localStorage.getItem("usuario") || "haike_dev";
+  const t = translations[idioma];
+
+  // ==========================================
+  // 2. ESTADOS: INÍCIO (HOME)
+  // ==========================================
+  const [saldo, setSaldo] = useState<number | null>(null);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [novaDescricao, setNovaDescricao] = useState("");
+  const [novoValor, setNovoValor] = useState("");
+  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<
+    "INCOME" | "EXPENSE"
+  >("EXPENSE");
+  const [categoriaSelecionada, setCategoriaSelecionada] =
+    useState<string>("OTHER");
+  const [menuCategoriaAberto, setMenuCategoriaAberto] = useState(false);
+  const menuCategoriaRef = useRef<HTMLDivElement>(null);
+
+  // ==========================================
+  // 3. ESTADOS: EXTRATO DETALHADO
+  // ==========================================
+  const dataAtual = new Date();
+  const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
+  const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
+
+  // ==========================================
+  // 4. ESTADOS: MEUS CARTÕES
+  // ==========================================
+  const [cartoes, setCartoes] = useState<Cartao[]>([
+    {
+      id: 1,
+      nome: "Nubank",
+      final: "4321",
+      limite: 5000,
+      faturaAtual: 1250.5,
+      cor: "#8A05BE",
+    },
+    {
+      id: 2,
+      nome: "Banco Inter",
+      final: "9876",
+      limite: 3000,
+      faturaAtual: 0,
+      cor: "#FF7A00",
+    },
+  ]);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [novoCartaoNome, setNovoCartaoNome] = useState("");
+  const [novoCartaoFinal, setNovoCartaoFinal] = useState("");
+  const [novoCartaoLimite, setNovoCartaoLimite] = useState("");
+  const [novoCartaoCor, setNovoCartaoCor] = useState("#8A05BE");
+
+  // ==========================================
+  // EFEITOS (LIFECYCLE)
+  // ==========================================
+  useEffect(() => {
+    localStorage.setItem("abaAtiva", abaAtiva);
+  }, [abaAtiva]);
+  useEffect(() => {
+    localStorage.setItem("idioma", idioma);
+  }, [idioma]);
+
+  useEffect(() => {
+    buscarTudo();
+    buscarCotacoes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleClickFora = (event: MouseEvent) => {
+      if (
+        menuIdiomaRef.current &&
+        !menuIdiomaRef.current.contains(event.target as Node)
+      )
+        setMenuIdiomaAberto(false);
+      if (
+        menuCategoriaRef.current &&
+        !menuCategoriaRef.current.contains(event.target as Node)
+      )
+        setMenuCategoriaAberto(false);
+    };
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, []);
+
+  useEffect(() => {
+    const categoriasValidas = getCategoriasDisponiveis();
+    if (!categoriasValidas.includes(categoriaSelecionada)) {
+      setCategoriaSelecionada(
+        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipoTransacaoSelecionado]);
+
+  // ==========================================
+  // FUNÇÕES GLOBAIS E API
+  // ==========================================
+  const buscarTudo = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/");
+    try {
+      const [resSaldo, resTrans] = await Promise.all([
+        axios.get(
+          "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+        axios.get(
+          "https://swiss-project-api.onrender.com/api/v1/transactions",
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+      ]);
+      setSaldo(
+        resSaldo.data.balance !== undefined
+          ? resSaldo.data.balance
+          : resSaldo.data,
+      );
+      setTransacoes(
+        Array.isArray(resTrans.data)
+          ? resTrans.data
+          : resTrans.data.content || [],
+      );
+    } catch (erro) {
+      console.error(erro);
+      navigate("/");
+    }
+  };
+
+  const buscarCotacoes = async () => {
+    try {
+      const res = await axios.get(
+        "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL",
+      );
+      setCotacoes({
+        usd: parseFloat(res.data.USDBRL.bid),
+        eur: parseFloat(res.data.EURBRL.bid),
+      });
+    } catch (erro) {
+      console.error(erro);
+    }
+  };
+
+  const handleLogoClick = () => {
+    localStorage.setItem("abaAtiva", "home");
+    window.location.reload();
+  };
+
+  // ==========================================
+  // FUNÇÕES: INÍCIO (HOME)
+  // ==========================================
+
+  // Tratamento dos inputs (Estavam faltando!)
+  const handleDescricaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNovaDescricao(e.target.value.replace(/[0-9]/g, ""));
+  };
+
+  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNovoValor(e.target.value.replace(/[^0-9.,]/g, ""));
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    try {
+      const valorNumerico = Math.abs(parseFloat(novoValor.replace(",", ".")));
+      if (isNaN(valorNumerico)) return alert(t.errorValue);
+
+      let valorParaSalvar = valorNumerico;
+      if (moedaExibicao === "USD" && cotacoes.usd > 0)
+        valorParaSalvar = valorNumerico * cotacoes.usd;
+      if (moedaExibicao === "EUR" && cotacoes.eur > 0)
+        valorParaSalvar = valorNumerico * cotacoes.eur;
+
+      const dataSeguraParaBanco = new Date().toISOString().split("T")[0];
+
+      await axios.post(
+        "https://swiss-project-api.onrender.com/api/v1/transactions",
+        {
+          description:
+            novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
+          amount: valorParaSalvar,
+          transactionDate: dataSeguraParaBanco,
+          type: tipoTransacaoSelecionado,
+          category: categoriaSelecionada,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      setNovaDescricao("");
+      setNovoValor("");
+      buscarTudo();
+    } catch (erro) {
+      console.error(erro);
+      alert("Erro ao salvar! Verifique o servidor.");
+    }
+  };
+
+  const handleDeleteTransaction = async (id?: number) => {
+    if (!id || !window.confirm(t.confirmDelete)) return;
+    try {
+      await axios.delete(
+        `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
+      buscarTudo();
+    } catch (erro) {
+      console.error(erro);
+    }
+  };
+
+  // ==========================================
+  // FUNÇÕES: EXTRATO DETALHADO
+  // ==========================================
+  const handleMesAnterior = () => {
+    if (mesFiltro === 1) {
+      setMesFiltro(12);
+      setAnoFiltro(anoFiltro - 1);
+    } else setMesFiltro(mesFiltro - 1);
+  };
+
+  const handleMesSeguinte = () => {
+    if (mesFiltro === 12) {
+      setMesFiltro(1);
+      setAnoFiltro(anoFiltro + 1);
+    } else setMesFiltro(mesFiltro + 1);
+  };
+
+  const transacoesFiltradas = transacoes.filter((t) => {
+    if (!t.transactionDate) return false;
+    const [anoStr, mesStr] = t.transactionDate.split("-");
+    return (
+      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
+    );
+  });
+
+  const totalEntradasMes = transacoesFiltradas
+    .filter((t) => t.type === "INCOME")
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const totalSaidasMes = transacoesFiltradas
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const saldoMes = totalEntradasMes - totalSaidasMes;
+
+  // ==========================================
+  // FUNÇÕES: MEUS CARTÕES
+  // ==========================================
+  const handleAddCartao = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoCartaoNome || !novoCartaoFinal || !novoCartaoLimite) return;
+
+    const limiteNumerico = parseFloat(
+      novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", "."),
+    );
+    if (isNaN(limiteNumerico)) return alert(t.errorValue);
+
+    setCartoes([
+      ...cartoes,
+      {
+        id: Date.now(),
+        nome: novoCartaoNome,
+        final: novoCartaoFinal,
+        limite: limiteNumerico,
+        faturaAtual: 0,
+        cor: novoCartaoCor,
+      },
+    ]);
+
+    setIsCardModalOpen(false);
+    setNovoCartaoNome("");
+    setNovoCartaoFinal("");
+    setNovoCartaoLimite("");
+    setNovoCartaoCor("#8A05BE");
+  };
+
+  // ==========================================
+  // HELPERS DE FORMATAÇÃO E COMPONENTES MENORES
+  // ==========================================
+  const getCategoriasDisponiveis = () => {
+    const catKeys =
+      tipoTransacaoSelecionado === "INCOME"
+        ? ["SALARY", "SALES"]
+        : ["BILLS", "ENTERTAINMENT", "FOOD", "MARKET", "TRANSPORT"];
+    catKeys.sort((a, b) =>
+      categoryMap[a][idioma].localeCompare(categoryMap[b][idioma]),
+    );
+    return [...catKeys, "OTHER"];
+  };
+
+  const getValorExibicao = (valorBaseReal: number) => {
+    if (moedaExibicao === "USD" && cotacoes.usd > 0)
+      return {
+        simbolo: "US$",
+        valorFormatado: (valorBaseReal / cotacoes.usd).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      };
+    if (moedaExibicao === "EUR" && cotacoes.eur > 0)
+      return {
+        simbolo: "€",
+        valorFormatado: (valorBaseReal / cotacoes.eur).toLocaleString("es-ES", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      };
+    return {
+      simbolo: "R$",
+      valorFormatado: valorBaseReal.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    };
+  };
+
+  const fmtBRL = (v: number) =>
+    `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtUSD = (v: number) =>
+    `US$ ${(v / cotacoes.usd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtEUR = (v: number) =>
+    `€ ${(v / cotacoes.eur).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const formatarDataLocal = (dataString?: string) => {
+    if (!dataString) return "---";
+    const partes = dataString.split("T")[0].split("-");
+    if (partes.length !== 3) return dataString;
+    const mapaLocais: Record<IdiomaType, string> = {
+      pt: "pt-BR",
+      en: "en-US",
+      es: "es-ES",
+      fr: "fr-FR",
+      de: "de-DE",
+      it: "it-IT",
+      ja: "ja-JP",
+      zh: "zh-CN",
+      ko: "ko-KR",
+    };
+    return new Date(
+      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])),
+    ).toLocaleDateString(mapaLocais[idioma], {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const CategoryOption = ({ catKey }: { catKey: string }) => {
+    const isSelected = categoriaSelecionada === catKey;
+    return (
+      <div
+        onClick={() => {
+          setCategoriaSelecionada(catKey);
+          setMenuCategoriaAberto(false);
+        }}
+        style={{
+          padding: "10px 14px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          backgroundColor: isSelected ? "#f4f6f8" : "transparent",
+          borderRadius: "8px",
+          marginBottom: "2px",
+        }}
+        onMouseEnter={(e) => {
+          if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb";
+        }}
+        onMouseLeave={(e) => {
+          if (!isSelected)
+            e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <span style={{ fontSize: "1.2rem" }}>{categoryMap[catKey].emoji}</span>
+        <span
+          style={{
+            fontWeight: isSelected ? "600" : "400",
+            color: isSelected ? "#111" : "#555",
+            fontSize: "0.9rem",
+          }}
+        >
+          {categoryMap[catKey][idioma]}
+        </span>
+        {isSelected && (
+          <span
+            style={{
+              marginLeft: "auto",
+              color: "#EC0000",
+              fontSize: "0.85rem",
+            }}
+          >
+            ✔
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const AppLogo = ({ size = 45 }: { size?: number }) => (
+    <div
+      style={{
+        backgroundColor: "#faf8f8",
+        borderRadius: "10px",
+        width: `${size}px`,
+        height: `${size}px`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+      }}
+    >
+      <img
+        src={logoImg}
+        alt="Logo"
+        style={{
+          height: "100%",
+          width: "100%",
+          objectFit: "cover",
+          transform: "scale(1.4)",
+        }}
+      />
+    </div>
+  );
+
+  const SidebarItem = ({
+    id,
+    icon,
+    label,
+  }: {
+    id: AbaType;
+    icon: string;
+    label: string;
+  }) => {
+    const isAtivo = abaAtiva === id;
+    return (
+      <li
+        onClick={() => {
+          setAbaAtiva(id);
+          setMenuAberto(false);
+        }}
+        style={{
+          padding: "1.2rem 1.5rem",
+          borderBottom: "1px solid #f0f0f0",
+          cursor: "pointer",
+          fontWeight: isAtivo ? "bold" : "normal",
+          color: isAtivo ? "#EC0000" : "#666",
+          borderLeft: isAtivo ? "4px solid #EC0000" : "4px solid transparent",
+          backgroundColor: isAtivo ? "#fff9f9" : "transparent",
+          transition: "all 0.2s ease-in-out",
+        }}
+        onMouseEnter={(e) => {
+          if (!isAtivo) e.currentTarget.style.backgroundColor = "#fafafa";
+        }}
+        onMouseLeave={(e) => {
+          if (!isAtivo) e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <span style={{ marginRight: "8px" }}>{icon}</span> {label}
+      </li>
+    );
+  };
+
+  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
+    (a, b) => t.langs[a].localeCompare(t.langs[b]),
+  );
+  const catSelecionadaData =
+    categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
+
+  // ==========================================
+  // RENDERIZAÇÃO PRINCIPAL (JSX)
+  // ==========================================
+  return (
+    <div
+      style={{
+        fontFamily: "sans-serif",
+        backgroundColor: "#f9fafb",
+        minHeight: "100vh",
+        paddingBottom: "2rem",
+      }}
+    >
+      {/* OVERLAY DO MENU MOBILE */}
+      {menuAberto && (
+        <div
+          onClick={() => setMenuAberto(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            zIndex: 999,
+          }}
+        />
+      )}
+
+      {/* SIDEBAR (MENU LATERAL) */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: menuAberto ? 0 : "-308px",
+          width: "308px",
+          height: "100vh",
+          backgroundColor: "#fff",
+          boxShadow: "2px 0 10px rgba(0,0,0,0.1)",
+          transition: "left 0.3s ease-in-out",
+          zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: "#EC0000",
+            padding: "1.5rem 1.5rem",
+            color: "white",
+          }}
+        >
+          <div
+            onClick={handleLogoClick}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "5px",
+              cursor: "pointer",
+            }}
+          >
+            <AppLogo size={32} />
+            <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: "bold" }}>
+              {t.title}
+            </h2>
+          </div>
+          <p style={{ margin: "5px 0 0 0", fontSize: "0.85rem", opacity: 0.9 }}>
+            {t.subtitle}
+          </p>
+        </div>
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: 0,
+            flex: 1,
+            fontSize: "0.95rem",
+          }}
+        >
+          <SidebarItem id="home" icon="🏠" label={t.home} />
+          <SidebarItem id="statement" icon="📊" label={t.statement} />
+          <SidebarItem id="cards" icon="💳" label={t.cards} />
+          <SidebarItem id="settings" icon="⚙️" label={t.settings} />
+        </ul>
+      </div>
+
+      {/* HEADER (CABEÇALHO) */}
+      <header
+        style={{
+          backgroundColor: "#EC0000",
+          color: "white",
+          padding: "0 1.5rem",
+          height: "80px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderRadius: "0 0 22px 22px",
+          boxShadow: "0 8px 20px rgba(100, 98, 98, 0.35)",
+          marginBottom: "2rem",
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "30px",
+            height: "100%",
+          }}
+        >
+          <button
+            onClick={() => setMenuAberto(true)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "white",
+              fontSize: "2.0rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              padding: 0,
+            }}
+          >
+            ☰
+          </button>
+          <div
+            onClick={handleLogoClick}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "18px",
+              cursor: "pointer",
+              height: "100%",
+            }}
+          >
+            <AppLogo size={40} />
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "1.6rem",
+                fontWeight: "700",
+                letterSpacing: "0.5px",
+              }}
+            >
+              {t.title}
+            </h2>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <div ref={menuIdiomaRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setMenuIdiomaAberto(!menuIdiomaAberto)}
+              style={{
+                background: "rgba(255,255,255,0.15)",
+                border: "none",
+                borderRadius: "22px",
+                padding: "10px 13px",
+                fontSize: "1.1rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                color: "white",
+              }}
+            >
+              {t.flag}{" "}
+              <span style={{ fontSize: "0.8rem", opacity: 0.8 }}>▼</span>
+            </button>
+            {menuIdiomaAberto && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "60px",
+                  right: 0,
+                  backgroundColor: "#fff",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                  padding: "10px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "8px",
+                  zIndex: 1001,
+                  minWidth: "220px",
+                }}
+              >
+                {idiomasOrdenados.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => {
+                      setIdioma(lang);
+                      setMenuIdiomaAberto(false);
+                    }}
+                    style={{
+                      background: idioma === lang ? "#f5f5f5" : "transparent",
+                      border: "none",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "0.9rem",
+                      color: "#333",
+                      textAlign: "left",
+                      fontWeight: idioma === lang ? "bold" : "normal",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.1rem" }}>
+                      {translations[lang].flag}
+                    </span>{" "}
+                    {t.langs[lang]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+            <span style={{ fontSize: "1.0rem" }}>
+              {t.welcome}, <strong>{nomeUsuario}</strong>
+            </span>
+            <button
+              onClick={() => {
+                localStorage.removeItem("token");
+                navigate("/");
+              }}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                color: "white",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "25px",
+                fontSize: "1.0rem",
+                cursor: "pointer",
+                fontWeight: "600",
+              }}
+            >
+              {t.logout}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ÁREA DE CONTEÚDO */}
+      <div
+        style={{
+          padding: "0 2rem 2rem 2rem",
+          maxWidth: "750px",
+          margin: "0 auto",
+        }}
+      >
+        {/* ================= ABA 1: HOME ================= */}
+        {abaAtiva === "home" && (
+          <>
+            {/* Card Saldo Principal */}
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "2rem",
+                borderRadius: "16px",
+                textAlign: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                position: "relative",
+              }}
+            >
+              {cotacoes.usd > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "20px",
+                    right: "20px",
+                    display: "flex",
+                    gap: "5px",
+                    backgroundColor: "#f5f5f5",
+                    padding: "4px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {(["BRL", "USD", "EUR"] as const).map((moeda) => (
+                    <button
+                      key={moeda}
+                      onClick={() => setMoedaExibicao(moeda)}
+                      style={{
+                        background:
+                          moedaExibicao === moeda ? "#fff" : "transparent",
+                        border: "none",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        fontWeight: moedaExibicao === moeda ? "bold" : "normal",
+                        color: "#333",
+                        boxShadow:
+                          moedaExibicao === moeda
+                            ? "0 1px 3px rgba(0,0,0,0.1)"
+                            : "none",
+                      }}
+                    >
+                      {moeda}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p
+                style={{
+                  color: "#888",
+                  margin: 0,
+                  fontSize: "0.8rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}
+              >
+                {t.balance}
+              </p>
+              <h1
+                style={{
+                  fontSize: "2.5rem",
+                  margin: "10px 0",
+                  color: "#111",
+                  fontWeight: "600",
+                }}
+              >
+                {saldo !== null ? (
+                  <>
+                    <span
+                      style={{
+                        fontSize: "1.2rem",
+                        color: "#888",
+                        fontWeight: "normal",
+                        marginRight: "5px",
+                      }}
+                    >
+                      {getValorExibicao(saldo).simbolo}
+                    </span>
+                    {getValorExibicao(saldo).valorFormatado}
+                  </>
+                ) : (
+                  "---"
+                )}
+              </h1>
+              {saldo !== null && cotacoes.usd > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: "25px",
+                    marginTop: "15px",
+                    paddingTop: "15px",
+                    borderTop: "1px solid #f0f0f0",
+                  }}
+                >
+                  {moedaExibicao !== "BRL" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        color: "#555",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      <span>🇧🇷</span>
+                      <strong>{fmtBRL(saldo)}</strong>
+                    </div>
+                  )}
+                  {moedaExibicao !== "USD" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        color: "#555",
+                        fontSize: "0.95rem",
+                      }}
+                      title={`Cotação: R$ ${cotacoes.usd.toFixed(2)}`}
+                    >
+                      <span>🇺🇸</span>
+                      <strong>{fmtUSD(saldo)}</strong>
+                    </div>
+                  )}
+                  {moedaExibicao !== "EUR" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        color: "#555",
+                        fontSize: "0.95rem",
+                      }}
+                      title={`Cotação: R$ ${cotacoes.eur.toFixed(2)}`}
+                    >
+                      <span>🇪🇺</span>
+                      <strong>{fmtEUR(saldo)}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Registro de Nova Transação */}
+            <div
+              style={{
+                marginTop: "1.5rem",
+                padding: "1.5rem",
+                backgroundColor: "#fff",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h4 style={{ margin: "0 0 15px 0", color: "#333" }}>
+                {t.newTransaction}
+              </h4>
+              <form onSubmit={handleAddTransaction}>
+                <div
+                  style={{ display: "flex", gap: "8px", marginBottom: "15px" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setTipoTransacaoSelecionado("INCOME")}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: "20px",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      border:
+                        tipoTransacaoSelecionado === "INCOME"
+                          ? "1px solid #2e7d32"
+                          : "1px solid #eaeaea",
+                      backgroundColor:
+                        tipoTransacaoSelecionado === "INCOME"
+                          ? "#e8f5e9"
+                          : "#fafafa",
+                      color:
+                        tipoTransacaoSelecionado === "INCOME"
+                          ? "#2e7d32"
+                          : "#999",
+                    }}
+                  >
+                    + {t.income}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoTransacaoSelecionado("EXPENSE")}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: "20px",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      border:
+                        tipoTransacaoSelecionado === "EXPENSE"
+                          ? "1px solid #EC0000"
+                          : "1px solid #eaeaea",
+                      backgroundColor:
+                        tipoTransacaoSelecionado === "EXPENSE"
+                          ? "#ffebee"
+                          : "#fafafa",
+                      color:
+                        tipoTransacaoSelecionado === "EXPENSE"
+                          ? "#EC0000"
+                          : "#999",
+                    }}
+                  >
+                    - {t.expense}
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    ref={menuCategoriaRef}
+                    style={{ position: "relative", minWidth: "160px" }}
+                  >
+                    <div
+                      onClick={() =>
+                        setMenuCategoriaAberto(!menuCategoriaAberto)
+                      }
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 16px",
+                        borderRadius: "12px",
+                        border: "1px solid #eaeaea",
+                        backgroundColor: "#fff",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <span style={{ fontSize: "1.2rem" }}>
+                          {catSelecionadaData.emoji}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.95rem",
+                            color: "#333",
+                            fontWeight: "500",
+                          }}
+                        >
+                          {catSelecionadaData[idioma]}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "#ccc",
+                          transform: menuCategoriaAberto
+                            ? "rotate(180deg)"
+                            : "none",
+                          transition: "transform 0.2s",
+                        }}
+                      >
+                        ▼
+                      </span>
+                    </div>
+                    {menuCategoriaAberto && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 8px)",
+                          left: 0,
+                          width: "100%",
+                          backgroundColor: "#fff",
+                          borderRadius: "12px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                          padding: "8px",
+                          zIndex: 1002,
+                          border: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {getCategoriasDisponiveis().map((catKey) => (
+                          <CategoryOption key={catKey} catKey={catKey} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={t.descPlaceholder}
+                    required
+                    value={novaDescricao}
+                    onChange={handleDescricaoChange}
+                    style={{
+                      flex: 2,
+                      minWidth: "180px",
+                      padding: "10px 14px",
+                      borderRadius: "12px",
+                      border: "1px solid #eaeaea",
+                      backgroundColor: "#fafafa",
+                      outline: "none",
+                      fontSize: "0.9rem",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder={t.valPlaceholder}
+                    required
+                    value={novoValor}
+                    onChange={handleValorChange}
+                    style={{
+                      flex: 1,
+                      minWidth: "100px",
+                      padding: "10px 14px",
+                      borderRadius: "12px",
+                      border: "1px solid #eaeaea",
+                      backgroundColor: "#fafafa",
+                      outline: "none",
+                      textAlign: "right",
+                      fontSize: "0.9rem",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "#EC0000",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      fontSize: "0.9rem",
+                      boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                    }}
+                  >
+                    {t.btnRegister}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Histórico Geral */}
+            <div
+              style={{
+                marginTop: "1.5rem",
+                backgroundColor: "#fff",
+                padding: "1.5rem",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 15px 0",
+                  color: "#333",
+                  fontSize: "1.1rem",
+                  fontWeight: "600",
+                }}
+              >
+                {t.history}
+              </h3>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {transacoes.map((t_row, i) => {
+                    const isExpense = t_row.type === "EXPENSE";
+                    const infoExibicao = getValorExibicao(
+                      Math.abs(t_row.amount || 0),
+                    );
+                    const categoriaVisual =
+                      categoryMap[t_row.category || "OTHER"] ||
+                      categoryMap["OTHER"];
+                    const isOutros =
+                      !t_row.category || t_row.category === "OTHER";
+                    const corDeFundoIcone = isOutros
+                      ? isExpense
+                        ? "#ffebee"
+                        : "#e8f5e9"
+                      : categoriaVisual.bgColor;
+
+                    return (
+                      <tr
+                        key={t_row.id || i}
+                        style={{ borderBottom: "1px solid #f5f5f5" }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "15px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "10px",
+                              backgroundColor: corDeFundoIcone,
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              fontSize: "1.2rem",
+                            }}
+                            title={categoriaVisual[idioma]}
+                          >
+                            {categoriaVisual.emoji}
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: "500",
+                                color: "#333",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              {t_row.description}
+                            </div>
+                            <div
+                              style={{
+                                color: "#aaa",
+                                fontSize: "0.75rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: isExpense ? "#EC0000" : "#107c10",
+                                  fontWeight: "bold",
+                                  marginRight: "6px",
+                                }}
+                              >
+                                {categoriaVisual[idioma]}
+                              </span>
+                              • {formatarDataLocal(t_row.transactionDate)}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "14px 0", textAlign: "right" }}>
+                          <div
+                            style={{
+                              fontWeight: "600",
+                              color: isExpense ? "#EC0000" : "#107c10",
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {isExpense ? "- " : "+ "}
+                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                          </div>
+                        </td>
+                        <td style={{ width: "40px", textAlign: "right" }}>
+                          <button
+                            onClick={() => handleDeleteTransaction(t_row.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ccc",
+                              cursor: "pointer",
+                              fontSize: "1.2rem",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {transacoes.length === 0 && (
+                <p
+                  style={{
+                    textAlign: "center",
+                    color: "#999",
+                    fontSize: "0.9rem",
+                    marginTop: "20px",
+                  }}
+                >
+                  {t.noTransactions}
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ================= ABA 2: EXTRATO DETALHADO ================= */}
+        {abaAtiva === "statement" && (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+          >
+            {/* Controles de Filtro Mensal */}
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "1.5rem 2rem",
+                borderRadius: "16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+                📊 {t.statement}
+              </h2>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  backgroundColor: "#f9fafb",
+                  borderRadius: "12px",
+                  padding: "4px",
+                  border: "1px solid #eaeaea",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
+                }}
+              >
+                <button
+                  onClick={handleMesAnterior}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px 12px",
+                    fontSize: "1.1rem",
+                    color: "#555",
+                    borderRadius: "8px",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#eee")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
+                >
+                  ❮
+                </button>
+                <div
+                  style={{
+                    minWidth: "140px",
+                    textAlign: "center",
+                    fontWeight: "600",
+                    color: "#333",
+                    fontSize: "1rem",
+                    userSelect: "none",
+                  }}
+                >
+                  {t.months[mesFiltro - 1]} {anoFiltro}
+                </div>
+                <button
+                  onClick={handleMesSeguinte}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px 12px",
+                    fontSize: "1.1rem",
+                    color: "#555",
+                    borderRadius: "8px",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#eee")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
+                >
+                  ❯
+                </button>
+              </div>
+            </div>
+
+            {/* Cards de Resumo */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "15px",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: "4px solid #107c10",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.entries}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: "#107c10",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(totalEntradasMes).simbolo}
+                  </span>
+                  {getValorExibicao(totalEntradasMes).valorFormatado}
+                </h3>
+              </div>
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: "4px solid #EC0000",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.exits}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: "#EC0000",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(totalSaidasMes).simbolo}
+                  </span>
+                  {getValorExibicao(totalSaidasMes).valorFormatado}
+                </h3>
+              </div>
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "1.5rem",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  borderBottom: `4px solid ${saldoMes >= 0 ? "#107c10" : "#EC0000"}`,
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  {t.balanceTotal}
+                </p>
+                <h3
+                  style={{
+                    margin: "10px 0 0 0",
+                    color: "#111",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      color: saldoMes >= 0 ? "#107c10" : "#EC0000",
+                      marginRight: "4px",
+                    }}
+                  >
+                    {getValorExibicao(saldoMes).simbolo}
+                  </span>
+                  {getValorExibicao(saldoMes).valorFormatado}
+                </h3>
+              </div>
+            </div>
+
+            {/* Tabela do Mês */}
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "1.5rem",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 15px 0",
+                  color: "#333",
+                  fontSize: "1.1rem",
+                  fontWeight: "600",
+                }}
+              >
+                {t.periodTransactions}
+              </h3>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {transacoesFiltradas.map((t_row, i) => {
+                    const isExpense = t_row.type === "EXPENSE";
+                    const infoExibicao = getValorExibicao(
+                      Math.abs(t_row.amount || 0),
+                    );
+                    const categoriaVisual =
+                      categoryMap[t_row.category || "OTHER"] ||
+                      categoryMap["OTHER"];
+                    const isOutros =
+                      !t_row.category || t_row.category === "OTHER";
+                    const corDeFundoIcone = isOutros
+                      ? isExpense
+                        ? "#ffebee"
+                        : "#e8f5e9"
+                      : categoriaVisual.bgColor;
+
+                    return (
+                      <tr
+                        key={t_row.id || i}
+                        style={{ borderBottom: "1px solid #f5f5f5" }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "15px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "10px",
+                              backgroundColor: corDeFundoIcone,
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              fontSize: "1.2rem",
+                            }}
+                            title={categoriaVisual[idioma]}
+                          >
+                            {categoriaVisual.emoji}
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: "500",
+                                color: "#333",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              {t_row.description}
+                            </div>
+                            <div
+                              style={{
+                                color: "#aaa",
+                                fontSize: "0.75rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: isExpense ? "#EC0000" : "#107c10",
+                                  fontWeight: "bold",
+                                  marginRight: "6px",
+                                }}
+                              >
+                                {categoriaVisual[idioma]}
+                              </span>
+                              • {formatarDataLocal(t_row.transactionDate)}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "14px 0", textAlign: "right" }}>
+                          <div
+                            style={{
+                              fontWeight: "600",
+                              color: isExpense ? "#EC0000" : "#107c10",
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {isExpense ? "- " : "+ "}
+                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                          </div>
+                        </td>
+                        <td style={{ width: "40px", textAlign: "right" }}>
+                          <button
+                            onClick={() => handleDeleteTransaction(t_row.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ccc",
+                              cursor: "pointer",
+                              fontSize: "1.2rem",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {transacoesFiltradas.length === 0 && (
+                <div style={{ textAlign: "center", padding: "40px 0" }}>
+                  <span style={{ fontSize: "2rem" }}>📭</span>
+                  <p
+                    style={{
+                      color: "#999",
+                      fontSize: "0.95rem",
+                      marginTop: "10px",
+                    }}
+                  >
+                    {t.noTransactionsMonth}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ================= ABA 3: MEUS CARTÕES ================= */}
+        {abaAtiva === "cards" && (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+          >
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "1.5rem 2rem",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+                💳 {t.cards}
+              </h2>
+              <button
+                onClick={() => setIsCardModalOpen(true)}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#EC0000",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                }}
+              >
+                {t.newCard}
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                gap: "15px",
+              }}
+            >
+              {cartoes.map((cartao) => (
+                <div
+                  key={cartao.id}
+                  style={{
+                    backgroundColor: cartao.cor,
+                    color: "white",
+                    padding: "1.5rem",
+                    borderRadius: "16px",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "20px",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "-50%",
+                      right: "-20%",
+                      width: "200px",
+                      height: "200px",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      borderRadius: "50%",
+                      transform: "rotate(30deg)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      zIndex: 1,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "1.1rem",
+                        fontWeight: "600",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      {cartao.nome}
+                    </span>
+                    <span style={{ fontSize: "1.5rem" }}>💳</span>
+                  </div>
+                  <div style={{ zIndex: 1, marginTop: "10px" }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "0.8rem",
+                        opacity: 0.8,
+                        textTransform: "uppercase",
+                        letterSpacing: "2px",
+                      }}
+                    >
+                      {t.cardEnding}
+                    </p>
+                    <p
+                      style={{
+                        margin: "5px 0 0 0",
+                        fontSize: "1.2rem",
+                        letterSpacing: "3px",
+                      }}
+                    >
+                      **** **** **** {cartao.final}
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-end",
+                      zIndex: 1,
+                      marginTop: "10px",
+                    }}
+                  >
+                    <div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "0.75rem",
+                          opacity: 0.8,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {t.currentInvoice}
+                      </p>
+                      <p
+                        style={{
+                          margin: "2px 0 0 0",
+                          fontSize: "1.1rem",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        R${" "}
+                        {cartao.faturaAtual.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "0.75rem",
+                          opacity: 0.8,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {t.availableLimit}
+                      </p>
+                      <p style={{ margin: "2px 0 0 0", fontSize: "0.95rem" }}>
+                        R${" "}
+                        {(cartao.limite - cartao.faturaAtual).toLocaleString(
+                          "pt-BR",
+                          { minimumFractionDigits: 2 },
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ================= ABA 4: CONFIGURAÇÕES ================= */}
+        {abaAtiva === "settings" && (
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "3rem 2rem",
+              borderRadius: "16px",
+              textAlign: "center",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            }}
+          >
+            <h2 style={{ color: "#333", marginBottom: "10px" }}>
+              ⚙️ {t.settings}
+            </h2>
+            <p style={{ color: "#777", maxWidth: "400px", margin: "0 auto" }}>
+              Gerencie as preferências da sua conta, troque sua senha e ative o
+              modo escuro (Dark Mode).
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* MODAL: NOVO CARTÃO */}
+      {isCardModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "2rem",
+              borderRadius: "20px",
+              width: "90%",
+              maxWidth: "400px",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3
+              style={{
+                marginTop: 0,
+                marginBottom: "20px",
+                color: "#333",
+                fontSize: "1.2rem",
+              }}
+            >
+              {t.modalCardTitle}
+            </h3>
+            <form
+              onSubmit={handleAddCartao}
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+            >
+              <input
+                placeholder={t.cardNamePlaceholder}
+                value={novoCartaoNome}
+                onChange={(e) => setNovoCartaoNome(e.target.value)}
+                required
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #ddd",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                }}
+              />
+              <input
+                placeholder={t.cardEndPlaceholder}
+                maxLength={4}
+                value={novoCartaoFinal}
+                onChange={(e) =>
+                  setNovoCartaoFinal(e.target.value.replace(/\D/g, ""))
+                }
+                required
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #ddd",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                }}
+              />
+              <input
+                placeholder={t.cardLimitPlaceholder}
+                value={novoCartaoLimite}
+                onChange={(e) => setNovoCartaoLimite(e.target.value)}
+                required
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #ddd",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                }}
+              />
+              <div>
+                <p
+                  style={{
+                    margin: "5px 0 10px 0",
+                    fontSize: "0.9rem",
+                    color: "#555",
+                    fontWeight: "500",
+                  }}
+                >
+                  {t.cardColor}
+                </p>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  {[
+                    "#8A05BE",
+                    "#FF7A00",
+                    "#107c10",
+                    "#0277bd",
+                    "#111111",
+                    "#E53935",
+                  ].map((cor) => (
+                    <div
+                      key={cor}
+                      onClick={() => setNovoCartaoCor(cor)}
+                      style={{
+                        width: "35px",
+                        height: "35px",
+                        borderRadius: "50%",
+                        backgroundColor: cor,
+                        cursor: "pointer",
+                        border:
+                          novoCartaoCor === cor
+                            ? "3px solid #ccc"
+                            : "2px solid transparent",
+                        transform:
+                          novoCartaoCor === cor ? "scale(1.1)" : "none",
+                        transition: "all 0.2s",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                  marginTop: "15px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsCardModalOpen(false)}
+                  style={{
+                    padding: "10px 15px",
+                    border: "none",
+                    background: "transparent",
+                    color: "#777",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: "10px 20px",
+                    border: "none",
+                    background: "#EC0000",
+                    color: "white",
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                    fontSize: "0.95rem",
+                    boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                  }}
+                >
+                  {t.save}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// DICIONÁRIOS E MAPEAMENTOS (FINAL DO ARQUIVO)
+// ==========================================
+
 const translations = {
   pt: {
     flag: "🇧🇷",
@@ -45,6 +2028,17 @@ const translations = {
     balanceTotal: "Balanço",
     periodTransactions: "Transações do Período",
     noTransactionsMonth: "Nenhuma transação encontrada neste mês.",
+    newCard: "+ Novo Cartão",
+    currentInvoice: "Fatura Atual",
+    availableLimit: "Limite Disp.",
+    cardEnding: "Final",
+    modalCardTitle: "Adicionar Novo Cartão",
+    cardNamePlaceholder: "Nome (ex: Nubank)",
+    cardEndPlaceholder: "Final (ex: 4321)",
+    cardLimitPlaceholder: "Limite (R$)",
+    cardColor: "Cor do Cartão",
+    cancel: "Cancelar",
+    save: "Salvar",
     months: [
       "Janeiro",
       "Fevereiro",
@@ -98,6 +2092,17 @@ const translations = {
     balanceTotal: "Balance",
     periodTransactions: "Period Transactions",
     noTransactionsMonth: "No transactions found this month.",
+    newCard: "+ New Card",
+    currentInvoice: "Current Invoice",
+    availableLimit: "Avail. Limit",
+    cardEnding: "Ending",
+    modalCardTitle: "Add New Card",
+    cardNamePlaceholder: "Name (ex: Nubank)",
+    cardEndPlaceholder: "Ending (ex: 4321)",
+    cardLimitPlaceholder: "Limit ($)",
+    cardColor: "Card Color",
+    cancel: "Cancel",
+    save: "Save",
     months: [
       "January",
       "February",
@@ -151,6 +2156,17 @@ const translations = {
     balanceTotal: "Balance",
     periodTransactions: "Transacciones del Período",
     noTransactionsMonth: "No se encontraron transacciones este mes.",
+    newCard: "+ Nueva Tarjeta",
+    currentInvoice: "Factura Actual",
+    availableLimit: "Límite Disp.",
+    cardEnding: "Termina en",
+    modalCardTitle: "Agregar Nueva Tarjeta",
+    cardNamePlaceholder: "Nombre (ej: Nubank)",
+    cardEndPlaceholder: "Termina en (ej: 4321)",
+    cardLimitPlaceholder: "Límite ($)",
+    cardColor: "Color de Tarjeta",
+    cancel: "Cancelar",
+    save: "Guardar",
     months: [
       "Enero",
       "Febrero",
@@ -204,6 +2220,17 @@ const translations = {
     balanceTotal: "Bilan",
     periodTransactions: "Transactions de la Période",
     noTransactionsMonth: "Aucune transaction trouvée ce mois-ci.",
+    newCard: "+ Nouvelle Carte",
+    currentInvoice: "Facture Actuelle",
+    availableLimit: "Limite Disp.",
+    cardEnding: "Se termine par",
+    modalCardTitle: "Ajouter une Carte",
+    cardNamePlaceholder: "Nom (ex: Nubank)",
+    cardEndPlaceholder: "Finissant par (ex: 4321)",
+    cardLimitPlaceholder: "Limite (€)",
+    cardColor: "Couleur de la Carte",
+    cancel: "Annuler",
+    save: "Sauvegarder",
     months: [
       "Janvier",
       "Février",
@@ -214,7 +2241,7 @@ const translations = {
       "Juillet",
       "Août",
       "Septembre",
-      "Octobre",
+      "Octubre",
       "Novembre",
       "Décembre",
     ],
@@ -257,6 +2284,17 @@ const translations = {
     balanceTotal: "Bilanz",
     periodTransactions: "Transaktionen im Zeitraum",
     noTransactionsMonth: "In diesem Monat wurden keine Transaktionen gefunden.",
+    newCard: "+ Neue Karte",
+    currentInvoice: "Aktuelle Rechnung",
+    availableLimit: "Verf. Limit",
+    cardEnding: "Endet mit",
+    modalCardTitle: "Neue Karte hinzufügen",
+    cardNamePlaceholder: "Name (z.B. Nubank)",
+    cardEndPlaceholder: "Endet mit (z.B. 4321)",
+    cardLimitPlaceholder: "Limit (€)",
+    cardColor: "Kartenfarbe",
+    cancel: "Abbrechen",
+    save: "Speichern",
     months: [
       "Januar",
       "Februar",
@@ -310,6 +2348,17 @@ const translations = {
     balanceTotal: "Bilancio",
     periodTransactions: "Transazioni del Periodo",
     noTransactionsMonth: "Nessuna transazione trovata in questo mese.",
+    newCard: "+ Nuova Carta",
+    currentInvoice: "Fattura Attuale",
+    availableLimit: "Limite Disp.",
+    cardEnding: "Termina con",
+    modalCardTitle: "Aggiungi Nuova Carta",
+    cardNamePlaceholder: "Nome (es: Nubank)",
+    cardEndPlaceholder: "Termina con (es: 4321)",
+    cardLimitPlaceholder: "Limite (€)",
+    cardColor: "Colore Carta",
+    cancel: "Annulla",
+    save: "Salva",
     months: [
       "Gennaio",
       "Febbraio",
@@ -363,6 +2412,17 @@ const translations = {
     balanceTotal: "残高",
     periodTransactions: "期間の取引",
     noTransactionsMonth: "今月の取引は見つかりませんでした。",
+    newCard: "+ 新しいカード",
+    currentInvoice: "現在の請求額",
+    availableLimit: "利用可能枠",
+    cardEnding: "末尾",
+    modalCardTitle: "新しいカードを追加",
+    cardNamePlaceholder: "名前 (例: Nubank)",
+    cardEndPlaceholder: "末尾 (例: 4321)",
+    cardLimitPlaceholder: "限度額 (¥)",
+    cardColor: "カードの色",
+    cancel: "キャンセル",
+    save: "保存",
     months: [
       "1月",
       "2月",
@@ -416,6 +2476,17 @@ const translations = {
     balanceTotal: "余额",
     periodTransactions: "期间交易",
     noTransactionsMonth: "本月未找到交易。",
+    newCard: "+ 新卡",
+    currentInvoice: "当前账单",
+    availableLimit: "可用额度",
+    cardEnding: "尾号",
+    modalCardTitle: "添加新卡",
+    cardNamePlaceholder: "名称 (例: Nubank)",
+    cardEndPlaceholder: "尾号 (例: 4321)",
+    cardLimitPlaceholder: "额度 (¥)",
+    cardColor: "卡片颜色",
+    cancel: "取消",
+    save: "保存",
     months: [
       "一月",
       "二月",
@@ -469,6 +2540,17 @@ const translations = {
     balanceTotal: "잔액",
     periodTransactions: "기간 거래",
     noTransactionsMonth: "이번 달에 거래가 없습니다.",
+    newCard: "+ 새 카드",
+    currentInvoice: "현재 청구서",
+    availableLimit: "사용 가능 한도",
+    cardEnding: "끝자리",
+    modalCardTitle: "새 카드 추가",
+    cardNamePlaceholder: "이름 (예: Nubank)",
+    cardEndPlaceholder: "끝자리 (예: 4321)",
+    cardLimitPlaceholder: "한도 (₩)",
+    cardColor: "카드 색상",
+    cancel: "취소",
+    save: "저장",
     months: [
       "1월",
       "2월",
@@ -486,7 +2568,6 @@ const translations = {
   },
 };
 
-// --- DICIONÁRIO E ESTILO DAS CATEGORIAS ---
 const categoryMap: Record<
   string,
   {
@@ -617,1675 +2698,3 @@ const categoryMap: Record<
     bgColor: "#f5f5f5",
   },
 };
-
-type IdiomaType = keyof typeof translations;
-type AbaType = "home" | "statement" | "cards" | "settings";
-
-interface Transacao {
-  id?: number;
-  description?: string;
-  amount?: number;
-  transactionDate?: string;
-  type?: string;
-  category?: string;
-}
-
-export function Dashboard() {
-  const navigate = useNavigate();
-  const [abaAtiva, setAbaAtiva] = useState<AbaType>("home");
-  const [saldo, setSaldo] = useState<number | null>(null);
-  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
-
-  const [novaDescricao, setNovaDescricao] = useState("");
-  const [novoValor, setNovoValor] = useState("");
-  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<
-    "INCOME" | "EXPENSE"
-  >("EXPENSE");
-  const [categoriaSelecionada, setCategoriaSelecionada] =
-    useState<string>("OTHER");
-
-  const [menuCategoriaAberto, setMenuCategoriaAberto] = useState(false);
-  const menuCategoriaRef = useRef<HTMLDivElement>(null);
-
-  const [menuAberto, setMenuAberto] = useState(false);
-  const [idioma, setIdioma] = useState<IdiomaType>("pt");
-  const [menuIdiomaAberto, setMenuIdiomaAberto] = useState(false);
-  const t = translations[idioma];
-  const menuIdiomaRef = useRef<HTMLDivElement>(null);
-
-  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">(
-    "BRL",
-  );
-  const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
-  const nomeUsuario = localStorage.getItem("usuario") || "haike_dev";
-
-  // --- LÓGICA DO EXTRATO DETALHADO (FILTROS) ---
-  const dataAtual = new Date();
-  const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
-  const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
-
-  // Funções para controle das setas do Extrato Detalhado
-  const handleMesAnterior = () => {
-    if (mesFiltro === 1) {
-      setMesFiltro(12);
-      setAnoFiltro(anoFiltro - 1);
-    } else {
-      setMesFiltro(mesFiltro - 1);
-    }
-  };
-
-  const handleMesSeguinte = () => {
-    if (mesFiltro === 12) {
-      setMesFiltro(1);
-      setAnoFiltro(anoFiltro + 1);
-    } else {
-      setMesFiltro(mesFiltro + 1);
-    }
-  };
-
-  const transacoesFiltradas = transacoes.filter((t) => {
-    if (!t.transactionDate) return false;
-    const [anoStr, mesStr] = t.transactionDate.split("-");
-    return (
-      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
-    );
-  });
-
-  const totalEntradasMes = transacoesFiltradas
-    .filter((t) => t.type === "INCOME")
-    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
-
-  const totalSaidasMes = transacoesFiltradas
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
-
-  const saldoMes = totalEntradasMes - totalSaidasMes;
-  // ----------------------------------------------
-
-  const buscarTudo = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/");
-      return;
-    }
-    try {
-      const [resSaldo, resTrans] = await Promise.all([
-        axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
-        axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions",
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
-      ]);
-      setSaldo(
-        resSaldo.data.balance !== undefined
-          ? resSaldo.data.balance
-          : resSaldo.data,
-      );
-      setTransacoes(
-        Array.isArray(resTrans.data)
-          ? resTrans.data
-          : resTrans.data.content || [],
-      );
-    } catch (erro) {
-      console.error(erro);
-      navigate("/");
-    }
-  };
-
-  const buscarCotacoes = async () => {
-    try {
-      const res = await axios.get(
-        "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL",
-      );
-      setCotacoes({
-        usd: parseFloat(res.data.USDBRL.bid),
-        eur: parseFloat(res.data.EURBRL.bid),
-      });
-    } catch (erro) {
-      console.error("Erro ao buscar cotações:", erro);
-    }
-  };
-
-  useEffect(() => {
-    buscarTudo();
-    buscarCotacoes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const handleClickFora = (event: MouseEvent) => {
-      if (
-        menuIdiomaRef.current &&
-        !menuIdiomaRef.current.contains(event.target as Node)
-      ) {
-        setMenuIdiomaAberto(false);
-      }
-      if (
-        menuCategoriaRef.current &&
-        !menuCategoriaRef.current.contains(event.target as Node)
-      ) {
-        setMenuCategoriaAberto(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickFora);
-    return () => document.removeEventListener("mousedown", handleClickFora);
-  }, []);
-
-  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
-    (a, b) => {
-      const nomeA = t.langs[a];
-      const nomeB = t.langs[b];
-      return nomeA.localeCompare(nomeB);
-    },
-  );
-
-  const getCategoriasDisponiveis = () => {
-    const catKeys =
-      tipoTransacaoSelecionado === "INCOME"
-        ? ["SALARY", "SALES"]
-        : ["BILLS", "ENTERTAINMENT", "FOOD", "MARKET", "TRANSPORT"];
-
-    catKeys.sort((a, b) => {
-      const catA = categoryMap[a] as Record<string, string>;
-      const catB = categoryMap[b] as Record<string, string>;
-      return catA[idioma].localeCompare(catB[idioma]);
-    });
-
-    return [...catKeys, "OTHER"];
-  };
-
-  useEffect(() => {
-    const categoriasValidas = getCategoriasDisponiveis();
-    if (!categoriasValidas.includes(categoriaSelecionada)) {
-      setCategoriaSelecionada(
-        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoTransacaoSelecionado]);
-
-  const handleDescricaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNovaDescricao(e.target.value.replace(/[0-9]/g, ""));
-  };
-
-  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNovoValor(e.target.value.replace(/[^0-9.,]/g, ""));
-  };
-
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = localStorage.getItem("token");
-    try {
-      const valorCorrigido = novoValor.replace(",", ".");
-      const valorNumerico = Math.abs(parseFloat(valorCorrigido));
-      if (isNaN(valorNumerico)) {
-        alert(t.errorValue);
-        return;
-      }
-      const descFormatada =
-        novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1);
-
-      let valorParaSalvar = valorNumerico;
-      if (moedaExibicao === "USD" && cotacoes.usd > 0)
-        valorParaSalvar = valorNumerico * cotacoes.usd;
-      if (moedaExibicao === "EUR" && cotacoes.eur > 0)
-        valorParaSalvar = valorNumerico * cotacoes.eur;
-
-      const dataHojeLocal = new Date();
-      const ano = dataHojeLocal.getFullYear();
-      const mes = String(dataHojeLocal.getMonth() + 1).padStart(2, "0");
-      const dia = String(dataHojeLocal.getDate()).padStart(2, "0");
-      const dataSeguraParaBanco = `${ano}-${mes}-${dia}`;
-
-      await axios.post(
-        "https://swiss-project-api.onrender.com/api/v1/transactions",
-        {
-          description: descFormatada,
-          amount: valorParaSalvar,
-          transactionDate: dataSeguraParaBanco,
-          type: tipoTransacaoSelecionado,
-          category: categoriaSelecionada,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      setNovaDescricao("");
-      setNovoValor("");
-      buscarTudo();
-    } catch (erro) {
-      console.error(erro);
-      alert(
-        "Erro ao salvar! Certifique-se de que reiniciou o servidor Java para aplicar a categoria Mercado.",
-      );
-    }
-  };
-
-  const handleDeleteTransaction = async (id?: number) => {
-    if (!id || !window.confirm(t.confirmDelete)) return;
-    const token = localStorage.getItem("token");
-    try {
-      await axios.delete(
-        `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      buscarTudo();
-    } catch (erro) {
-      console.error(erro);
-    }
-  };
-
-  const getValorExibicao = (valorBaseReal: number) => {
-    if (moedaExibicao === "USD" && cotacoes.usd > 0)
-      return {
-        simbolo: "US$",
-        valorFormatado: (valorBaseReal / cotacoes.usd).toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-      };
-    if (moedaExibicao === "EUR" && cotacoes.eur > 0)
-      return {
-        simbolo: "€",
-        valorFormatado: (valorBaseReal / cotacoes.eur).toLocaleString("es-ES", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-      };
-    return {
-      simbolo: "R$",
-      valorFormatado: valorBaseReal.toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    };
-  };
-
-  const fmtBRL = (v: number) =>
-    `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const fmtUSD = (v: number) =>
-    `US$ ${(v / cotacoes.usd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const fmtEUR = (v: number) =>
-    `€ ${(v / cotacoes.eur).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const formatarDataLocal = (dataString?: string) => {
-    if (!dataString) return "---";
-    const apenasData = dataString.split("T")[0];
-    const partes = apenasData.split("-");
-    if (partes.length !== 3) return dataString;
-    const dataObj = new Date(
-      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])),
-    );
-    const mapaLocais: Record<IdiomaType, string> = {
-      pt: "pt-BR",
-      en: "en-US",
-      es: "es-ES",
-      fr: "fr-FR",
-      de: "de-DE",
-      it: "it-IT",
-      ja: "ja-JP",
-      zh: "zh-CN",
-      ko: "ko-KR",
-    };
-    return dataObj.toLocaleDateString(mapaLocais[idioma], {
-      timeZone: "UTC",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
-  const CategoryOption = ({ catKey }: { catKey: string }) => {
-    const cat = categoryMap[catKey];
-    const isSelected = categoriaSelecionada === catKey;
-    const catName = cat[idioma as keyof typeof cat] as string;
-
-    return (
-      <div
-        onClick={() => {
-          setCategoriaSelecionada(catKey);
-          setMenuCategoriaAberto(false);
-        }}
-        style={{
-          padding: "10px 14px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          backgroundColor: isSelected ? "#f4f6f8" : "transparent",
-          borderRadius: "8px",
-          transition: "all 0.2s ease",
-          marginBottom: "2px",
-        }}
-        onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb";
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected)
-            e.currentTarget.style.backgroundColor = "transparent";
-        }}
-      >
-        <span style={{ fontSize: "1.2rem" }}>{cat.emoji}</span>
-        <span
-          style={{
-            fontWeight: isSelected ? "600" : "400",
-            color: isSelected ? "#111" : "#555",
-            fontSize: "0.9rem",
-          }}
-        >
-          {catName}
-        </span>
-        {isSelected && (
-          <span
-            style={{
-              marginLeft: "auto",
-              color: "#EC0000",
-              fontSize: "0.85rem",
-            }}
-          >
-            ✔
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const catSelecionadaData =
-    categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
-  const catSelecionadaName = catSelecionadaData[
-    idioma as keyof typeof catSelecionadaData
-  ] as string;
-
-  // --- COMPONENTE DA LOGO ATUALIZADA (AUMENTADA) ---
-  const AppLogo = ({ size = 45 }: { size?: number }) => (
-    <div
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: "10px",
-        width: `${size}px`,
-        height: `${size}px`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-      }}
-    >
-      <img
-        src={logoImg}
-        alt="Logo"
-        style={{
-          height: "100%",
-          width: "100%",
-          objectFit: "cover",
-          transform: "scale(1.3)",
-        }}
-      />
-    </div>
-  );
-
-  // --- COMPONENTE DO MENU LATERAL (SIDEBAR ITEM) ---
-  const SidebarItem = ({
-    id,
-    icon,
-    label,
-  }: {
-    id: AbaType;
-    icon: string;
-    label: string;
-  }) => {
-    const isAtivo = abaAtiva === id;
-    return (
-      <li
-        onClick={() => {
-          setAbaAtiva(id);
-          setMenuAberto(false);
-        }}
-        style={{
-          padding: "1.2rem 1.5rem",
-          borderBottom: "1px solid #f0f0f0",
-          cursor: "pointer",
-          fontWeight: isAtivo ? "bold" : "normal",
-          color: isAtivo ? "#EC0000" : "#666",
-          borderLeft: isAtivo ? "4px solid #EC0000" : "4px solid transparent",
-          backgroundColor: isAtivo ? "#fff9f9" : "transparent",
-          transition: "all 0.2s ease-in-out",
-        }}
-        onMouseEnter={(e) => {
-          if (!isAtivo) e.currentTarget.style.backgroundColor = "#fafafa";
-        }}
-        onMouseLeave={(e) => {
-          if (!isAtivo) e.currentTarget.style.backgroundColor = "transparent";
-        }}
-      >
-        <span style={{ marginRight: "8px" }}>{icon}</span> {label}
-      </li>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        fontFamily: "sans-serif",
-        backgroundColor: "#f9fafb",
-        minHeight: "100vh",
-        paddingBottom: "2rem",
-      }}
-    >
-      {menuAberto && (
-        <div
-          onClick={() => setMenuAberto(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            zIndex: 999,
-          }}
-        />
-      )}
-
-      {/* --- MENU LATERAL (SIDEBAR) --- */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: menuAberto ? 0 : "-308px",
-          width: "308px",
-          height: "100vh",
-          backgroundColor: "#fff",
-          boxShadow: "2px 0 10px rgba(0,0,0,0.1)",
-          transition: "left 0.3s ease-in-out",
-          zIndex: 1000,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#EC0000",
-            padding: "1.5rem 1.5rem",
-            color: "white",
-          }}
-        >
-          <div
-            onClick={() => window.location.reload()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              marginBottom: "5px",
-              cursor: "pointer",
-            }}
-          >
-            <AppLogo size={32} />
-            <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: "bold" }}>
-              {t.title}
-            </h2>
-          </div>
-
-          <p style={{ margin: "5px 0 0 0", fontSize: "0.85rem", opacity: 0.9 }}>
-            {t.subtitle}
-          </p>
-        </div>
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            flex: 1,
-            fontSize: "0.95rem",
-          }}
-        >
-          <SidebarItem id="home" icon="🏠" label={t.home} />
-          <SidebarItem id="statement" icon="📊" label={t.statement} />
-          <SidebarItem id="cards" icon="💳" label={t.cards} />
-          <SidebarItem id="settings" icon="⚙️" label={t.settings} />
-        </ul>
-      </div>
-
-      {/* --- CABEÇALHO PRINCIPAL (HEADER) --- */}
-      <header
-        style={{
-          backgroundColor: "#EC0000",
-          color: "white",
-          padding: "0 1.5rem",
-          height: "80px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderRadius: "0 0 22px 22px",
-          boxShadow: "0 8px 20px rgba(100, 98, 98, 0.35)",
-          marginBottom: "2rem",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
-        {/* Lado Esquerdo: Menu e Logo agrupados */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "30px",
-            height: "100%",
-          }}
-        >
-          {/* Três tracinhos PRIMEIRO */}
-          <button
-            onClick={() => setMenuAberto(true)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "white",
-              fontSize: "2.0rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-            }}
-          >
-            ☰
-          </button>
-
-          {/* Logo e Nome LOGO DEPOIS */}
-          <div
-            onClick={() => window.location.reload()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "18px",
-              cursor: "pointer",
-              height: "100%",
-            }}
-          >
-            <AppLogo size={40} />
-
-            <h2
-              style={{
-                margin: 0,
-                fontSize: "1.6rem",
-                fontWeight: "700",
-                letterSpacing: "0.5px",
-              }}
-            >
-              {t.title}
-            </h2>
-          </div>
-        </div>
-
-        {/* Lado Direito: Idiomas e User */}
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <div ref={menuIdiomaRef} style={{ position: "relative" }}>
-            <button
-              onClick={() => setMenuIdiomaAberto(!menuIdiomaAberto)}
-              style={{
-                background: "rgba(255,255,255,0.15)",
-                border: "none",
-                borderRadius: "22px",
-                padding: "10px 13px",
-                fontSize: "1.1rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "7px",
-                color: "white",
-              }}
-              title="Trocar Idioma"
-            >
-              {t.flag}{" "}
-              <span style={{ fontSize: "0.8rem", opacity: 0.8 }}>▼</span>
-            </button>
-
-            {menuIdiomaAberto && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "60px",
-                  right: 0,
-                  backgroundColor: "#fff",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-                  padding: "10px",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "8px",
-                  zIndex: 1001,
-                  minWidth: "220px",
-                }}
-              >
-                {idiomasOrdenados.map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => {
-                      setIdioma(lang);
-                      setMenuIdiomaAberto(false);
-                    }}
-                    style={{
-                      background: idioma === lang ? "#f5f5f5" : "transparent",
-                      border: "none",
-                      padding: "8px 10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontSize: "0.9rem",
-                      color: "#333",
-                      textAlign: "left",
-                      fontWeight: idioma === lang ? "bold" : "normal",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem" }}>
-                      {translations[lang].flag}
-                    </span>{" "}
-                    {t.langs[lang]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <span style={{ fontSize: "1.0rem" }}>
-              {t.welcome}, <strong>{nomeUsuario}</strong>
-            </span>
-            <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                navigate("/");
-              }}
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                color: "white",
-                border: "none",
-                padding: "10px 20px",
-                borderRadius: "25px",
-                fontSize: "1.0rem",
-                cursor: "pointer",
-                fontWeight: "600",
-              }}
-            >
-              {t.logout}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Margem superior ajustada para o conteúdo principal começar abaixo do cabeçalho maior */}
-      <div
-        style={{
-          padding: "0 2rem 2rem 2rem",
-          maxWidth: "750px",
-          margin: "0 auto",
-        }}
-      >
-        {/* --- ABA HOME --- */}
-        {abaAtiva === "home" && (
-          <>
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "2rem",
-                borderRadius: "16px",
-                textAlign: "center",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                position: "relative",
-              }}
-            >
-              {cotacoes.usd > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
-                    display: "flex",
-                    gap: "5px",
-                    backgroundColor: "#f5f5f5",
-                    padding: "4px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <button
-                    onClick={() => setMoedaExibicao("BRL")}
-                    style={{
-                      background:
-                        moedaExibicao === "BRL" ? "#fff" : "transparent",
-                      border: "none",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: moedaExibicao === "BRL" ? "bold" : "normal",
-                      color: "#333",
-                      boxShadow:
-                        moedaExibicao === "BRL"
-                          ? "0 1px 3px rgba(0,0,0,0.1)"
-                          : "none",
-                    }}
-                  >
-                    BRL
-                  </button>
-                  <button
-                    onClick={() => setMoedaExibicao("USD")}
-                    style={{
-                      background:
-                        moedaExibicao === "USD" ? "#fff" : "transparent",
-                      border: "none",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: moedaExibicao === "USD" ? "bold" : "normal",
-                      color: "#333",
-                      boxShadow:
-                        moedaExibicao === "USD"
-                          ? "0 1px 3px rgba(0,0,0,0.1)"
-                          : "none",
-                    }}
-                  >
-                    USD
-                  </button>
-                  <button
-                    onClick={() => setMoedaExibicao("EUR")}
-                    style={{
-                      background:
-                        moedaExibicao === "EUR" ? "#fff" : "transparent",
-                      border: "none",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: moedaExibicao === "EUR" ? "bold" : "normal",
-                      color: "#333",
-                      boxShadow:
-                        moedaExibicao === "EUR"
-                          ? "0 1px 3px rgba(0,0,0,0.1)"
-                          : "none",
-                    }}
-                  >
-                    EUR
-                  </button>
-                </div>
-              )}
-
-              <p
-                style={{
-                  color: "#888",
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "1px",
-                }}
-              >
-                {t.balance}
-              </p>
-              <h1
-                style={{
-                  fontSize: "2.5rem",
-                  margin: "10px 0",
-                  color: "#111",
-                  fontWeight: "600",
-                }}
-              >
-                {saldo !== null ? (
-                  <>
-                    <span
-                      style={{
-                        fontSize: "1.2rem",
-                        color: "#888",
-                        fontWeight: "normal",
-                        marginRight: "5px",
-                      }}
-                    >
-                      {getValorExibicao(saldo).simbolo}
-                    </span>
-                    {getValorExibicao(saldo).valorFormatado}
-                  </>
-                ) : (
-                  "---"
-                )}
-              </h1>
-
-              {saldo !== null && cotacoes.usd > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: "25px",
-                    marginTop: "15px",
-                    paddingTop: "15px",
-                    borderTop: "1px solid #f0f0f0",
-                  }}
-                >
-                  {moedaExibicao !== "BRL" && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        color: "#555",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      <span>🇧🇷</span>
-                      <strong>{fmtBRL(saldo)}</strong>
-                    </div>
-                  )}
-                  {moedaExibicao !== "USD" && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        color: "#555",
-                        fontSize: "0.95rem",
-                      }}
-                      title={`Cotação: R$ ${cotacoes.usd.toFixed(2)}`}
-                    >
-                      <span>🇺🇸</span>
-                      <strong>{fmtUSD(saldo)}</strong>
-                    </div>
-                  )}
-                  {moedaExibicao !== "EUR" && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        color: "#555",
-                        fontSize: "0.95rem",
-                      }}
-                      title={`Cotação: R$ ${cotacoes.eur.toFixed(2)}`}
-                    >
-                      <span>🇪🇺</span>
-                      <strong>{fmtEUR(saldo)}</strong>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                marginTop: "1.5rem",
-                padding: "1.5rem",
-                backgroundColor: "#fff",
-                borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-              }}
-            >
-              <h4 style={{ margin: "0 0 15px 0", color: "#333" }}>
-                {t.newTransaction}
-              </h4>
-              <form onSubmit={handleAddTransaction}>
-                <div
-                  style={{ display: "flex", gap: "8px", marginBottom: "15px" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setTipoTransacaoSelecionado("INCOME")}
-                    style={{
-                      padding: "6px 16px",
-                      borderRadius: "20px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      border:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "1px solid #2e7d32"
-                          : "1px solid #eaeaea",
-                      backgroundColor:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "#e8f5e9"
-                          : "#fafafa",
-                      color:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "#2e7d32"
-                          : "#999",
-                    }}
-                  >
-                    + {t.income}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTipoTransacaoSelecionado("EXPENSE")}
-                    style={{
-                      padding: "6px 16px",
-                      borderRadius: "20px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      border:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "1px solid #EC0000"
-                          : "1px solid #eaeaea",
-                      backgroundColor:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "#ffebee"
-                          : "#fafafa",
-                      color:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "#EC0000"
-                          : "#999",
-                    }}
-                  >
-                    - {t.expense}
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    ref={menuCategoriaRef}
-                    style={{ position: "relative", minWidth: "160px" }}
-                  >
-                    <div
-                      onClick={() =>
-                        setMenuCategoriaAberto(!menuCategoriaAberto)
-                      }
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "10px 16px",
-                        borderRadius: "12px",
-                        border: "1px solid #eaeaea",
-                        backgroundColor: "#fff",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.2rem" }}>
-                          {catSelecionadaData.emoji}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.95rem",
-                            color: "#333",
-                            fontWeight: "500",
-                          }}
-                        >
-                          {catSelecionadaName}
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "0.7rem",
-                          color: "#ccc",
-                          transform: menuCategoriaAberto
-                            ? "rotate(180deg)"
-                            : "none",
-                          transition: "transform 0.2s",
-                        }}
-                      >
-                        ▼
-                      </span>
-                    </div>
-
-                    {menuCategoriaAberto && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "calc(100% + 8px)",
-                          left: 0,
-                          width: "100%",
-                          backgroundColor: "#fff",
-                          borderRadius: "12px",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                          padding: "8px",
-                          zIndex: 1002,
-                          border: "1px solid #f0f0f0",
-                        }}
-                      >
-                        {getCategoriasDisponiveis().map((catKey) => (
-                          <CategoryOption key={catKey} catKey={catKey} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder={t.descPlaceholder}
-                    required
-                    value={novaDescricao}
-                    onChange={handleDescricaoChange}
-                    style={{
-                      flex: 2,
-                      minWidth: "180px",
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      border: "1px solid #eaeaea",
-                      backgroundColor: "#fafafa",
-                      outline: "none",
-                      fontSize: "0.9rem",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.valPlaceholder}
-                    required
-                    value={novoValor}
-                    onChange={handleValorChange}
-                    style={{
-                      flex: 1,
-                      minWidth: "100px",
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      border: "1px solid #eaeaea",
-                      backgroundColor: "#fafafa",
-                      outline: "none",
-                      textAlign: "right",
-                      fontSize: "0.9rem",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "10px 20px",
-                      backgroundColor: "#EC0000",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "12px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
-                    }}
-                  >
-                    {t.btnRegister}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div
-              style={{
-                marginTop: "1.5rem",
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 15px 0",
-                  color: "#333",
-                  fontSize: "1.1rem",
-                  fontWeight: "600",
-                }}
-              >
-                {t.history}
-              </h3>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  {transacoes.map((t_row, i) => {
-                    const isExpense = t_row.type === "EXPENSE";
-                    const valorAbsoluto = Math.abs(t_row.amount || 0);
-                    const infoExibicao = getValorExibicao(valorAbsoluto);
-
-                    const categoriaVisual =
-                      categoryMap[t_row.category || "OTHER"] ||
-                      categoryMap["OTHER"];
-                    const nomeCategoriaTraduzido = categoriaVisual[
-                      idioma as keyof typeof categoriaVisual
-                    ] as string;
-
-                    // --- NOVA LÓGICA DE COR DE FUNDO PARA 'OUTROS' ---
-                    const isOutros =
-                      !t_row.category || t_row.category === "OTHER";
-                    const corDeFundoIcone = isOutros
-                      ? isExpense
-                        ? "#ffebee"
-                        : "#e8f5e9"
-                      : categoriaVisual.bgColor;
-
-                    return (
-                      <tr
-                        key={t_row.id || i}
-                        style={{ borderBottom: "1px solid #f5f5f5" }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 0",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "15px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              borderRadius: "10px",
-                              backgroundColor: corDeFundoIcone,
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              fontSize: "1.2rem",
-                            }}
-                            title={nomeCategoriaTraduzido}
-                          >
-                            {categoriaVisual.emoji}
-                          </div>
-
-                          <div>
-                            <div
-                              style={{
-                                fontWeight: "500",
-                                color: "#333",
-                                fontSize: "0.95rem",
-                              }}
-                            >
-                              {t_row.description}
-                            </div>
-                            <div
-                              style={{
-                                color: "#aaa",
-                                fontSize: "0.75rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  color: isExpense ? "#EC0000" : "#107c10",
-                                  fontWeight: "bold",
-                                  marginRight: "6px",
-                                }}
-                              >
-                                {nomeCategoriaTraduzido}
-                              </span>
-                              • {formatarDataLocal(t_row.transactionDate)}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 0", textAlign: "right" }}>
-                          <div
-                            style={{
-                              fontWeight: "600",
-                              color: isExpense ? "#EC0000" : "#107c10",
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {isExpense ? "- " : "+ "}
-                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
-                          </div>
-                        </td>
-                        <td style={{ width: "40px", textAlign: "right" }}>
-                          <button
-                            onClick={() => handleDeleteTransaction(t_row.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#ccc",
-                              cursor: "pointer",
-                              fontSize: "1.2rem",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {transacoes.length === 0 && (
-                <p
-                  style={{
-                    textAlign: "center",
-                    color: "#999",
-                    fontSize: "0.9rem",
-                    marginTop: "20px",
-                  }}
-                >
-                  {t.noTransactions}
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* --- ABA EXTRATO DETALHADO --- */}
-        {abaAtiva === "statement" && (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-          >
-            {/* CONTROLES DE FILTRO */}
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem 2rem",
-                borderRadius: "16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-              }}
-            >
-              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
-                📊 {t.statement}
-              </h2>
-
-              {/* FILTRO MODERNO COM SETAS */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  backgroundColor: "#f9fafb",
-                  borderRadius: "12px",
-                  padding: "4px",
-                  border: "1px solid #eaeaea",
-                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
-                }}
-              >
-                <button
-                  onClick={handleMesAnterior}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "8px 12px",
-                    fontSize: "1.1rem",
-                    color: "#555",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#eee")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
-                >
-                  ❮
-                </button>
-
-                <div
-                  style={{
-                    minWidth: "140px",
-                    textAlign: "center",
-                    fontWeight: "600",
-                    color: "#333",
-                    fontSize: "1rem",
-                    userSelect: "none",
-                  }}
-                >
-                  {t.months[mesFiltro - 1]} {anoFiltro}
-                </div>
-
-                <button
-                  onClick={handleMesSeguinte}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "8px 12px",
-                    fontSize: "1.1rem",
-                    color: "#555",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#eee")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
-                >
-                  ❯
-                </button>
-              </div>
-            </div>
-
-            {/* CARDS DE RESUMO */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "15px",
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: "#fff",
-                  padding: "1.5rem",
-                  borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: "4px solid #107c10",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#888",
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  {t.entries}
-                </p>
-                <h3
-                  style={{
-                    margin: "10px 0 0 0",
-                    color: "#111",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "1rem",
-                      color: "#107c10",
-                      marginRight: "4px",
-                    }}
-                  >
-                    {getValorExibicao(totalEntradasMes).simbolo}
-                  </span>
-                  {getValorExibicao(totalEntradasMes).valorFormatado}
-                </h3>
-              </div>
-
-              <div
-                style={{
-                  backgroundColor: "#fff",
-                  padding: "1.5rem",
-                  borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: "4px solid #EC0000",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#888",
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  {t.exits}
-                </p>
-                <h3
-                  style={{
-                    margin: "10px 0 0 0",
-                    color: "#111",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "1rem",
-                      color: "#EC0000",
-                      marginRight: "4px",
-                    }}
-                  >
-                    {getValorExibicao(totalSaidasMes).simbolo}
-                  </span>
-                  {getValorExibicao(totalSaidasMes).valorFormatado}
-                </h3>
-              </div>
-
-              <div
-                style={{
-                  backgroundColor: "#fff",
-                  padding: "1.5rem",
-                  borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: `4px solid ${saldoMes >= 0 ? "#107c10" : "#EC0000"}`,
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#888",
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  {t.balanceTotal}
-                </p>
-                <h3
-                  style={{
-                    margin: "10px 0 0 0",
-                    color: "#111",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "1rem",
-                      color: saldoMes >= 0 ? "#107c10" : "#EC0000",
-                      marginRight: "4px",
-                    }}
-                  >
-                    {getValorExibicao(saldoMes).simbolo}
-                  </span>
-                  {getValorExibicao(saldoMes).valorFormatado}
-                </h3>
-              </div>
-            </div>
-
-            {/* TABELA DE TRANSAÇÕES FILTRADAS */}
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 15px 0",
-                  color: "#333",
-                  fontSize: "1.1rem",
-                  fontWeight: "600",
-                }}
-              >
-                {t.periodTransactions}
-              </h3>
-
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  {transacoesFiltradas.map((t_row, i) => {
-                    const isExpense = t_row.type === "EXPENSE";
-                    const valorAbsoluto = Math.abs(t_row.amount || 0);
-                    const infoExibicao = getValorExibicao(valorAbsoluto);
-
-                    const categoriaVisual =
-                      categoryMap[t_row.category || "OTHER"] ||
-                      categoryMap["OTHER"];
-                    const nomeCategoriaTraduzido = categoriaVisual[
-                      idioma as keyof typeof categoriaVisual
-                    ] as string;
-
-                    const isOutros =
-                      !t_row.category || t_row.category === "OTHER";
-                    const corDeFundoIcone = isOutros
-                      ? isExpense
-                        ? "#ffebee"
-                        : "#e8f5e9"
-                      : categoriaVisual.bgColor;
-
-                    return (
-                      <tr
-                        key={t_row.id || i}
-                        style={{ borderBottom: "1px solid #f5f5f5" }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 0",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "15px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              borderRadius: "10px",
-                              backgroundColor: corDeFundoIcone,
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              fontSize: "1.2rem",
-                            }}
-                            title={nomeCategoriaTraduzido}
-                          >
-                            {categoriaVisual.emoji}
-                          </div>
-                          <div>
-                            <div
-                              style={{
-                                fontWeight: "500",
-                                color: "#333",
-                                fontSize: "0.95rem",
-                              }}
-                            >
-                              {t_row.description}
-                            </div>
-                            <div
-                              style={{
-                                color: "#aaa",
-                                fontSize: "0.75rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  color: isExpense ? "#EC0000" : "#107c10",
-                                  fontWeight: "bold",
-                                  marginRight: "6px",
-                                }}
-                              >
-                                {nomeCategoriaTraduzido}
-                              </span>
-                              • {formatarDataLocal(t_row.transactionDate)}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 0", textAlign: "right" }}>
-                          <div
-                            style={{
-                              fontWeight: "600",
-                              color: isExpense ? "#EC0000" : "#107c10",
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {isExpense ? "- " : "+ "}
-                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
-                          </div>
-                        </td>
-                        <td style={{ width: "40px", textAlign: "right" }}>
-                          <button
-                            onClick={() => handleDeleteTransaction(t_row.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#ccc",
-                              cursor: "pointer",
-                              fontSize: "1.2rem",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {transacoesFiltradas.length === 0 && (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                  <span style={{ fontSize: "2rem" }}>📭</span>
-                  <p
-                    style={{
-                      color: "#999",
-                      fontSize: "0.95rem",
-                      marginTop: "10px",
-                    }}
-                  >
-                    {t.noTransactionsMonth}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- ABA MEUS CARTÕES --- */}
-        {abaAtiva === "cards" && (
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "3rem 2rem",
-              borderRadius: "16px",
-              textAlign: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            }}
-          >
-            <h2 style={{ color: "#333", marginBottom: "10px" }}>
-              💳 {t.cards}
-            </h2>
-            <p style={{ color: "#777", maxWidth: "400px", margin: "0 auto" }}>
-              Área reservada para cadastrar seus cartões de crédito e visualizar
-              limites e datas de fechamento.
-            </p>
-          </div>
-        )}
-
-        {/* --- ABA CONFIGURAÇÕES --- */}
-        {abaAtiva === "settings" && (
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "3rem 2rem",
-              borderRadius: "16px",
-              textAlign: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            }}
-          >
-            <h2 style={{ color: "#333", marginBottom: "10px" }}>
-              ⚙️ {t.settings}
-            </h2>
-            <p style={{ color: "#777", maxWidth: "400px", margin: "0 auto" }}>
-              Gerencie as preferências da sua conta, troque sua senha e ative o
-              modo escuro (Dark Mode).
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
