@@ -14,18 +14,124 @@ interface Transacao {
   transactionDate?: string;
   type?: string;
   category?: string;
+  card?: Cartao;
 }
 
 interface Cartao {
   id: number;
-  nome?: string; // O Backend envia como 'name'
-  name?: string; // Mapeando ambas as possibilidades
+  nome?: string;
+  name?: string;
   lastDigits: string;
   totalLimit: number;
   currentInvoice: number;
-  cor?: string; // O Backend envia como 'color'
-  color?: string; // Mapeando ambas as possibilidades
+  cor?: string;
+  color?: string;
 }
+
+// ==========================================
+// CUSTOM COMPONENTS FOR MODERN FORM (INTERNAL)
+// ==========================================
+
+const CategoryOption = ({ catKey, idiom, onSelect }: { catKey: string; idiom: IdiomaType; onSelect: () => void }) => {
+  const catData = categoryMap[catKey];
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        padding: "8px 12px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        borderRadius: "8px",
+        marginBottom: "2px",
+        backgroundColor: "transparent",
+        transition: "background-color 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#f9fafb";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      <span style={{ fontSize: "1.1rem" }}>{catData.emoji}</span>
+      <span
+        style={{
+          color: "#555",
+          fontSize: "0.85rem",
+          fontWeight: "500"
+        }}
+      >
+        {catData[idiom]}
+      </span>
+    </div>
+  );
+};
+
+const PaymentMethodOption = ({ card, t, onSelect, isSelected }: { card?: Cartao; t: typeof translations["pt"]; onSelect: () => void; isSelected: boolean }) => {
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        padding: "8px 12px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        backgroundColor: isSelected ? "#f4f6f8" : "transparent",
+        borderRadius: "8px",
+        marginBottom: "2px",
+        transition: "background-color 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb";
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      {card ? (
+        <>
+          <span style={{ fontSize: "1.1rem", color: card.color || card.cor || "#8A05BE" }}>💳</span>
+          <span
+            style={{
+              fontWeight: isSelected ? "600" : "500",
+              color: isSelected ? "#111" : "#555",
+              fontSize: "0.85rem",
+            }}
+          >
+            {card.nome || card.name} ({card.lastDigits})
+          </span>
+        </>
+      ) : (
+        <>
+          <span style={{ fontSize: "1.1rem" }}>🏦</span>
+          <span
+            style={{
+              fontWeight: isSelected ? "600" : "500",
+              color: isSelected ? "#111" : "#555",
+              fontSize: "0.85rem",
+            }}
+          >
+            {t.accountBalance}
+          </span>
+        </>
+      )}
+      {isSelected && (
+        <span
+          style={{
+            marginLeft: "auto",
+            color: "#EC0000",
+            fontSize: "0.85rem",
+          }}
+        >
+          ✔
+        </span>
+      )}
+    </div>
+  );
+};
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -65,12 +171,21 @@ export function Dashboard() {
   const [menuCategoriaAberto, setMenuCategoriaAberto] = useState(false);
   const menuCategoriaRef = useRef<HTMLDivElement>(null);
 
+  const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState<string>("");
+  const [menuCartaoAberto, setMenuCartaoAberto] = useState(false);
+  const menuCartaoRef = useRef<HTMLDivElement>(null);
+
   // ==========================================
   // 3. ESTADOS: EXTRATO DETALHADO
   // ==========================================
   const dataAtual = new Date();
   const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
   const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
+
+  // NOVO: Estados e Ref para o Date Picker Customizado
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState<number>(dataAtual.getFullYear());
+  const monthPickerRef = useRef<HTMLDivElement>(null);
 
   // ==========================================
   // 4. ESTADOS: MEUS CARTÕES
@@ -111,6 +226,16 @@ export function Dashboard() {
         !menuCategoriaRef.current.contains(event.target as Node)
       )
         setMenuCategoriaAberto(false);
+      if (
+        menuCartaoRef.current &&
+        !menuCartaoRef.current.contains(event.target as Node)
+      )
+        setMenuCartaoAberto(false);
+      if (
+        monthPickerRef.current &&
+        !monthPickerRef.current.contains(event.target as Node)
+      )
+        setIsMonthPickerOpen(false);
     };
     document.addEventListener("mousedown", handleClickFora);
     return () => document.removeEventListener("mousedown", handleClickFora);
@@ -122,6 +247,9 @@ export function Dashboard() {
       setCategoriaSelecionada(
         tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
       );
+    }
+    if (tipoTransacaoSelecionado === "INCOME") {
+      setCartaoSelecionadoId("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoTransacaoSelecionado]);
@@ -183,7 +311,7 @@ export function Dashboard() {
   // ==========================================
 
   const handleDescricaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNovaDescricao(e.target.value.replace(/[0-9]/g, ""));
+    setNovaDescricao(e.target.value);
   };
 
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,13 +342,16 @@ export function Dashboard() {
           transactionDate: dataSeguraParaBanco,
           type: tipoTransacaoSelecionado,
           category: categoriaSelecionada,
+          cardId: cartaoSelecionadoId ? Number(cartaoSelecionadoId) : null,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setNovaDescricao("");
       setNovoValor("");
+      setCartaoSelecionadoId(""); 
       buscarTudo();
+      buscarCartoes(); 
     } catch (erro) {
       console.error(erro);
       alert("Erro ao salvar! Verifique o servidor.");
@@ -237,6 +368,7 @@ export function Dashboard() {
         },
       );
       buscarTudo();
+      buscarCartoes(); 
     } catch (erro) {
       console.error(erro);
     }
@@ -268,17 +400,35 @@ export function Dashboard() {
   });
 
   const totalEntradasMes = transacoesFiltradas
-    .filter((t) => t.type === "INCOME")
+    .filter((t) => t.type === "INCOME" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalSaidasMes = transacoesFiltradas
-    .filter((t) => t.type === "EXPENSE")
+    .filter((t) => t.type === "EXPENSE" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const saldoMes = totalEntradasMes - totalSaidasMes;
+
+  const transacoesAgrupadas = transacoesFiltradas.reduce((grupos, transacao) => {
+    const isCard = !!transacao.card;
+    const key = isCard ? `card-${transacao.card?.id}` : "account";
+    const label = isCard 
+        ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})` 
+        : `🏦 ${t.accountBalance}`;
+    
+    if (!grupos[key]) {
+      grupos[key] = { 
+        label, 
+        items: [], 
+        color: isCard ? (transacao.card?.color || transacao.card?.cor || "#333") : "#107c10" 
+      };
+    }
+    grupos[key].items.push(transacao);
+    return grupos;
+  }, {} as Record<string, { label: string, items: Transacao[], color: string }>);
+
 
   // ==========================================
   // FUNÇÕES: MEUS CARTÕES
   // ==========================================
-
   const buscarCartoes = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -423,57 +573,6 @@ export function Dashboard() {
     });
   };
 
-  const CategoryOption = ({ catKey }: { catKey: string }) => {
-    const isSelected = categoriaSelecionada === catKey;
-    return (
-      <div
-        onClick={() => {
-          setCategoriaSelecionada(catKey);
-          setMenuCategoriaAberto(false);
-        }}
-        style={{
-          padding: "10px 14px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          backgroundColor: isSelected ? "#f4f6f8" : "transparent",
-          borderRadius: "8px",
-          marginBottom: "2px",
-        }}
-        onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb";
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected)
-            e.currentTarget.style.backgroundColor = "transparent";
-        }}
-      >
-        <span style={{ fontSize: "1.2rem" }}>{categoryMap[catKey].emoji}</span>
-        <span
-          style={{
-            fontWeight: isSelected ? "600" : "400",
-            color: isSelected ? "#111" : "#555",
-            fontSize: "0.9rem",
-          }}
-        >
-          {categoryMap[catKey][idioma]}
-        </span>
-        {isSelected && (
-          <span
-            style={{
-              marginLeft: "auto",
-              color: "#EC0000",
-              fontSize: "0.85rem",
-            }}
-          >
-            ✔
-          </span>
-        )}
-      </div>
-    );
-  };
-
   const AppLogo = ({ size = 45 }: { size?: number }) => (
     <div
       style={{
@@ -501,15 +600,7 @@ export function Dashboard() {
     </div>
   );
 
-  const SidebarItem = ({
-    id,
-    icon,
-    label,
-  }: {
-    id: AbaType;
-    icon: string;
-    label: string;
-  }) => {
+  const SidebarItem = ({ id, icon, label }: { id: AbaType; icon: string; label: string; }) => {
     const isAtivo = abaAtiva === id;
     return (
       <li
@@ -544,6 +635,8 @@ export function Dashboard() {
   );
   const catSelecionadaData =
     categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
+
+  const cartaoSelecionado = cartoes.find(c => String(c.id) === cartaoSelecionadoId);
 
   // ==========================================
   // RENDERIZAÇÃO PRINCIPAL (JSX)
@@ -946,132 +1039,96 @@ export function Dashboard() {
               )}
             </div>
 
-            {/* Registro de Nova Transação */}
             <div
               style={{
                 marginTop: "1.5rem",
-                padding: "1.5rem",
+                padding: "2rem",
                 backgroundColor: "#fff",
-                borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                borderRadius: "20px",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
               }}
             >
-              <h4 style={{ margin: "0 0 15px 0", color: "#333" }}>
+              <h4 style={{ margin: "0 0 20px 0", color: "#333", fontSize: "1.1rem", fontWeight: "600" }}>
                 {t.newTransaction}
               </h4>
-              <form onSubmit={handleAddTransaction}>
-                <div
-                  style={{ display: "flex", gap: "8px", marginBottom: "15px" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setTipoTransacaoSelecionado("INCOME")}
-                    style={{
-                      padding: "6px 16px",
-                      borderRadius: "20px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      border:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "1px solid #2e7d32"
-                          : "1px solid #eaeaea",
-                      backgroundColor:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "#e8f5e9"
-                          : "#fafafa",
-                      color:
-                        tipoTransacaoSelecionado === "INCOME"
-                          ? "#2e7d32"
-                          : "#999",
-                    }}
-                  >
-                    + {t.income}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTipoTransacaoSelecionado("EXPENSE")}
-                    style={{
-                      padding: "6px 16px",
-                      borderRadius: "20px",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      border:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "1px solid #EC0000"
-                          : "1px solid #eaeaea",
-                      backgroundColor:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "#ffebee"
-                          : "#fafafa",
-                      color:
-                        tipoTransacaoSelecionado === "EXPENSE"
-                          ? "#EC0000"
-                          : "#999",
-                    }}
-                  >
-                    - {t.expense}
-                  </button>
-                </div>
+              <form onSubmit={handleAddTransaction} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                
                 <div
                   style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    alignItems: "center",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    backgroundColor: "#f9fafb",
+                    borderRadius: "30px",
+                    padding: "4px",
+                    border: "1px solid #eaeaea",
+                    width: "fit-content",
+                    margin: "0 auto",
+                    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
                   }}
                 >
-                  <div
-                    ref={menuCategoriaRef}
-                    style={{ position: "relative", minWidth: "160px" }}
-                  >
+                  {(["EXPENSE", "INCOME"] as const).map((type) => {
+                    const isSelected = tipoTransacaoSelecionado === type;
+                    const isExpense = type === "EXPENSE";
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setTipoTransacaoSelecionado(type)}
+                        style={{
+                          background: isSelected ? (isExpense ? "#ffebee" : "#e8f5e9") : "transparent",
+                          border: "none",
+                          padding: "8px 25px",
+                          borderRadius: "25px",
+                          cursor: "pointer",
+                          fontSize: "0.85rem",
+                          fontWeight: "600",
+                          color: isSelected ? (isExpense ? "#EC0000" : "#2e7d32") : "#888",
+                          boxShadow: isSelected ? "0 2px 5px rgba(0,0,0,0.1)" : "none",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {isExpense ? "- " + t.expense : "+ " + t.income}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: tipoTransacaoSelecionado === "EXPENSE" ? "1fr 1fr" : "1fr",
+                    gap: "15px",
+                  }}
+                >
+                  
+                  <div ref={menuCategoriaRef} style={{ position: "relative" }}>
+                    <p style={{ margin: "0 0 6px 0", fontSize: "0.75rem", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {t.selCategory}
+                    </p>
                     <div
-                      onClick={() =>
-                        setMenuCategoriaAberto(!menuCategoriaAberto)
-                      }
+                      onClick={() => setMenuCategoriaAberto(!menuCategoriaAberto)}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "10px 16px",
-                        borderRadius: "12px",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
                         border: "1px solid #eaeaea",
-                        backgroundColor: "#fff",
+                        backgroundColor: "#fafafa",
                         cursor: "pointer",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                        transition: "border-color 0.2s",
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#ccc")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#eaeaea")}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.2rem" }}>
-                          {catSelecionadaData.emoji}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.95rem",
-                            color: "#333",
-                            fontWeight: "500",
-                          }}
-                        >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "1.1rem" }}>{catSelecionadaData.emoji}</span>
+                        <span style={{ fontSize: "0.9rem", color: "#333", fontWeight: "500" }}>
                           {catSelecionadaData[idioma]}
                         </span>
                       </div>
-                      <span
-                        style={{
-                          fontSize: "0.7rem",
-                          color: "#ccc",
-                          transform: menuCategoriaAberto
-                            ? "rotate(180deg)"
-                            : "none",
-                          transition: "transform 0.2s",
-                        }}
-                      >
+                      <span style={{ fontSize: "0.7rem", color: "#aaa", transform: menuCategoriaAberto ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                         ▼
                       </span>
                     </div>
@@ -1079,75 +1136,189 @@ export function Dashboard() {
                       <div
                         style={{
                           position: "absolute",
-                          top: "calc(100% + 8px)",
+                          top: "calc(100% + 5px)",
                           left: 0,
                           width: "100%",
                           backgroundColor: "#fff",
                           borderRadius: "12px",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                          padding: "8px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                          padding: "6px",
                           zIndex: 1002,
                           border: "1px solid #f0f0f0",
                         }}
                       >
                         {getCategoriasDisponiveis().map((catKey) => (
-                          <CategoryOption key={catKey} catKey={catKey} />
+                          <CategoryOption key={catKey} catKey={catKey} idiom={idioma} onSelect={() => {
+                            setCategoriaSelecionada(catKey);
+                            setMenuCategoriaAberto(false);
+                          }} />
                         ))}
                       </div>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    placeholder={t.descPlaceholder}
-                    required
-                    value={novaDescricao}
-                    onChange={handleDescricaoChange}
-                    style={{
-                      flex: 2,
-                      minWidth: "180px",
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      border: "1px solid #eaeaea",
-                      backgroundColor: "#fafafa",
-                      outline: "none",
-                      fontSize: "0.9rem",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.valPlaceholder}
-                    required
-                    value={novoValor}
-                    onChange={handleValorChange}
-                    style={{
-                      flex: 1,
-                      minWidth: "100px",
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      border: "1px solid #eaeaea",
-                      backgroundColor: "#fafafa",
-                      outline: "none",
-                      textAlign: "right",
-                      fontSize: "0.9rem",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "10px 20px",
-                      backgroundColor: "#EC0000",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "12px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
-                    }}
-                  >
-                    {t.btnRegister}
-                  </button>
+
+                  {tipoTransacaoSelecionado === "EXPENSE" && (
+                    <div ref={menuCartaoRef} style={{ position: "relative" }}>
+                      <p style={{ margin: "0 0 6px 0", fontSize: "0.75rem", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {t.paymentHistoryLabel || "Forma de Pagamento"}
+                      </p>
+                      <div
+                        onClick={() => {
+                            setMenuCartaoAberto(!menuCartaoAberto);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          border: "1px solid #eaeaea",
+                          backgroundColor: "#fafafa",
+                          cursor: "pointer",
+                          opacity: 1,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                          transition: "border-color 0.2s, background-color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = "#ccc";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = "#eaeaea";
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {cartaoSelecionado ? (
+                            <>
+                              <span style={{ fontSize: "1.1rem", color: cartaoSelecionado.color || cartaoSelecionado.cor || "#8A05BE" }}>💳</span>
+                              <span style={{ fontSize: "0.9rem", color: "#333", fontWeight: "500" }}>
+                                {cartaoSelecionado.nome || cartaoSelecionado.name} ({cartaoSelecionado.lastDigits})
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: "1.1rem" }}>🏦</span>
+                              <span style={{ fontSize: "0.9rem", color: "#333", fontWeight: "500" }}>
+                                {t.accountBalance}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <span style={{ fontSize: "0.7rem", color: "#aaa", transform: menuCartaoAberto ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                          ▼
+                        </span>
+                      </div>
+                      {menuCartaoAberto && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 5px)",
+                            left: 0,
+                            width: "100%",
+                            backgroundColor: "#fff",
+                            borderRadius: "12px",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                            padding: "6px",
+                            zIndex: 1002,
+                            border: "1px solid #f0f0f0",
+                          }}
+                        >
+                          <PaymentMethodOption t={t} onSelect={() => {
+                            setCartaoSelecionadoId("");
+                            setMenuCartaoAberto(false);
+                          }} isSelected={cartaoSelecionadoId === ""} />
+                          
+                          {cartoes.map((c) => (
+                            <PaymentMethodOption key={c.id} card={c} t={t} onSelect={() => {
+                              setCartaoSelecionadoId(String(c.id));
+                              setMenuCartaoAberto(false);
+                            }} isSelected={cartaoSelecionadoId === String(c.id)} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "15px", alignItems: "flex-end" }}>
+                  <div>
+                    <p style={{ margin: "0 0 6px 0", fontSize: "0.75rem", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {t.descriptionLabel || "Descrição"}
+                    </p>
+                    <input
+                      type="text"
+                      placeholder={t.descPlaceholder}
+                      required
+                      value={novaDescricao}
+                      onChange={handleDescricaoChange}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #eaeaea",
+                        backgroundColor: "#fafafa",
+                        outline: "none",
+                        fontSize: "0.9rem",
+                        boxSizing: "border-box",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                        transition: "border-color 0.2s",
+                      }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#EC0000")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#eaeaea")}
+                    />
+                  </div>
+                  <div>
+                    <p style={{ margin: "0 0 6px 0", fontSize: "0.75rem", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>
+                      {t.valueLabel || "Valor"}
+                    </p>
+                    <input
+                      type="text"
+                      placeholder={t.valPlaceholder}
+                      required
+                      value={novoValor}
+                      onChange={handleValorChange}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #eaeaea",
+                        backgroundColor: "#fafafa",
+                        outline: "none",
+                        textAlign: "right",
+                        fontSize: "0.9rem",
+                        boxSizing: "border-box",
+                        fontWeight: "600",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                        transition: "border-color 0.2s",
+                      }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#EC0000")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#eaeaea")}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{
+                    padding: "12px 20px",
+                    backgroundColor: "#EC0000",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    fontSize: "0.95rem",
+                    boxShadow: "0 4px 12px rgba(236,0,0,0.2)",
+                    transition: "background-color 0.2s, transform 0.1s",
+                    alignSelf: "center",
+                    minWidth: "150px",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#D50000")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#EC0000")}
+                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                  {t.btnRegister}
+                </button>
               </form>
             </div>
 
@@ -1244,6 +1415,12 @@ export function Dashboard() {
                                 {categoriaVisual[idioma]}
                               </span>
                               • {formatarDataLocal(t_row.transactionDate)}
+
+                              {t_row.card && (
+                                <span style={{ marginLeft: "6px", color: t_row.card.color || t_row.card.cor || "#888", fontWeight: "600" }}>
+                                  • 💳 {t_row.card.name || t_row.card.nome}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1299,7 +1476,6 @@ export function Dashboard() {
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            {/* Controles de Filtro Mensal */}
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1345,18 +1521,73 @@ export function Dashboard() {
                 >
                   ❮
                 </button>
-                <div
-                  style={{
-                    minWidth: "140px",
-                    textAlign: "center",
-                    fontWeight: "600",
-                    color: "#333",
-                    fontSize: "1rem",
-                    userSelect: "none",
-                  }}
-                >
-                  {t.months[mesFiltro - 1]} {anoFiltro}
+                
+                <div ref={monthPickerRef} style={{ position: "relative" }}>
+                  <div
+                    onClick={() => {
+                      setPickerYear(anoFiltro);
+                      setIsMonthPickerOpen(!isMonthPickerOpen);
+                    }}
+                    style={{
+                      minWidth: "140px",
+                      textAlign: "center",
+                      fontWeight: "600",
+                      color: "#333",
+                      fontSize: "1rem",
+                      userSelect: "none",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "8px",
+                      transition: "background-color 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#eee"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    {t.months[mesFiltro - 1]} {anoFiltro}
+                  </div>
+
+                  {isMonthPickerOpen && (
+                    <div style={{
+                      position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+                      backgroundColor: "#fff", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      padding: "16px", zIndex: 1005, width: "240px", border: "1px solid #f0f0f0", marginTop: "8px"
+                    }}>
+                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", padding: "0 4px" }}>
+                         <button onClick={() => setPickerYear(y => y - 1)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#555" }}>❮</button>
+                         <span style={{ fontWeight: "bold", fontSize: "1.1rem", color: "#111" }}>{pickerYear}</span>
+                         <button onClick={() => setPickerYear(y => y + 1)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#555" }}>❯</button>
+                       </div>
+                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                         {t.months.map((monthName, index) => {
+                            const isSelected = mesFiltro === index + 1 && anoFiltro === pickerYear;
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => {
+                                  setMesFiltro(index + 1);
+                                  setAnoFiltro(pickerYear);
+                                  setIsMonthPickerOpen(false);
+                                }}
+                                style={{
+                                  padding: "10px 0", border: "none", borderRadius: "10px",
+                                  backgroundColor: isSelected ? "#EC0000" : "#f9fafb",
+                                  color: isSelected ? "#fff" : "#555",
+                                  fontWeight: isSelected ? "bold" : "500",
+                                  cursor: "pointer", fontSize: "0.85rem",
+                                  transition: "background-color 0.2s"
+                                }}
+                                onMouseEnter={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = "#eee" }}
+                                onMouseLeave={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb" }}
+                              >
+                                 {monthName.slice(0, 3)}
+                              </button>
+                            )
+                         })}
+                       </div>
+                    </div>
+                  )}
                 </div>
+
                 <button
                   onClick={handleMesSeguinte}
                   style={{
@@ -1380,7 +1611,6 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Cards de Resumo */}
             <div
               style={{
                 display: "grid",
@@ -1507,7 +1737,6 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Tabela do Mês */}
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1526,113 +1755,131 @@ export function Dashboard() {
               >
                 {t.periodTransactions}
               </h3>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  {transacoesFiltradas.map((t_row, i) => {
-                    const isExpense = t_row.type === "EXPENSE";
-                    const infoExibicao = getValorExibicao(
-                      Math.abs(t_row.amount || 0),
-                    );
-                    const categoriaVisual =
-                      categoryMap[t_row.category || "OTHER"] ||
-                      categoryMap["OTHER"];
-                    const isOutros =
-                      !t_row.category || t_row.category === "OTHER";
-                    const corDeFundoIcone = isOutros
-                      ? isExpense
-                        ? "#ffebee"
-                        : "#e8f5e9"
-                      : categoriaVisual.bgColor;
+              
+              {Object.entries(transacoesAgrupadas).map(([key, grupo]) => (
+                <div key={key} style={{ marginBottom: "2.5rem" }}>
+                  <h4 style={{ 
+                    color: grupo.color, 
+                    borderBottom: `2px solid ${grupo.color}30`, 
+                    paddingBottom: "8px", 
+                    marginBottom: "15px", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    fontSize: "1.0rem",
+                    fontWeight: "600"
+                  }}>
+                    {grupo.label}
+                  </h4>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                      {grupo.items.map((t_row, i) => {
+                        const isExpense = t_row.type === "EXPENSE";
+                        const infoExibicao = getValorExibicao(
+                          Math.abs(t_row.amount || 0),
+                        );
+                        const categoriaVisual =
+                          categoryMap[t_row.category || "OTHER"] ||
+                          categoryMap["OTHER"];
+                        const isOutros =
+                          !t_row.category || t_row.category === "OTHER";
+                        const corDeFundoIcone = isOutros
+                          ? isExpense
+                            ? "#ffebee"
+                            : "#e8f5e9"
+                          : categoriaVisual.bgColor;
 
-                    return (
-                      <tr
-                        key={t_row.id || i}
-                        style={{ borderBottom: "1px solid #f5f5f5" }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 0",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "15px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              borderRadius: "10px",
-                              backgroundColor: corDeFundoIcone,
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              fontSize: "1.2rem",
-                            }}
-                            title={categoriaVisual[idioma]}
+                        return (
+                          <tr
+                            key={t_row.id || i}
+                            style={{ borderBottom: "1px solid #f5f5f5" }}
                           >
-                            {categoriaVisual.emoji}
-                          </div>
-                          <div>
-                            <div
+                            <td
                               style={{
-                                fontWeight: "500",
-                                color: "#333",
-                                fontSize: "0.95rem",
+                                padding: "14px 0",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "15px",
                               }}
                             >
-                              {t_row.description}
-                            </div>
-                            <div
-                              style={{
-                                color: "#aaa",
-                                fontSize: "0.75rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              <span
+                              <div
                                 style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  borderRadius: "10px",
+                                  backgroundColor: corDeFundoIcone,
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  fontSize: "1.2rem",
+                                }}
+                                title={categoriaVisual[idioma]}
+                              >
+                                {categoriaVisual.emoji}
+                              </div>
+                              <div>
+                                <div
+                                  style={{
+                                    fontWeight: "500",
+                                    color: "#333",
+                                    fontSize: "0.95rem",
+                                  }}
+                                >
+                                  {t_row.description}
+                                </div>
+                                <div
+                                  style={{
+                                    color: "#aaa",
+                                    fontSize: "0.75rem",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: isExpense ? "#EC0000" : "#107c10",
+                                      fontWeight: "bold",
+                                      marginRight: "6px",
+                                    }}
+                                  >
+                                    {categoriaVisual[idioma]}
+                                  </span>
+                                  • {formatarDataLocal(t_row.transactionDate)}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: "14px 0", textAlign: "right" }}>
+                              <div
+                                style={{
+                                  fontWeight: "600",
                                   color: isExpense ? "#EC0000" : "#107c10",
-                                  fontWeight: "bold",
-                                  marginRight: "6px",
+                                  fontSize: "0.95rem",
                                 }}
                               >
-                                {categoriaVisual[idioma]}
-                              </span>
-                              • {formatarDataLocal(t_row.transactionDate)}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 0", textAlign: "right" }}>
-                          <div
-                            style={{
-                              fontWeight: "600",
-                              color: isExpense ? "#EC0000" : "#107c10",
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {isExpense ? "- " : "+ "}
-                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
-                          </div>
-                        </td>
-                        <td style={{ width: "40px", textAlign: "right" }}>
-                          <button
-                            onClick={() => handleDeleteTransaction(t_row.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#ccc",
-                              cursor: "pointer",
-                              fontSize: "1.2rem",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                                {isExpense ? "- " : "+ "}
+                                {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                              </div>
+                            </td>
+                            <td style={{ width: "40px", textAlign: "right" }}>
+                              <button
+                                onClick={() => handleDeleteTransaction(t_row.id)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#ccc",
+                                  cursor: "pointer",
+                                  fontSize: "1.2rem",
+                                }}
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+
               {transacoesFiltradas.length === 0 && (
                 <div style={{ textAlign: "center", padding: "40px 0" }}>
                   <span style={{ fontSize: "2rem" }}>📭</span>
@@ -1695,14 +1942,13 @@ export function Dashboard() {
               </button>
             </div>
 
-            {/* Nova Grid: Mais estreita, espaçada e centralizada */}
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "35px", // Espaçamento aumentado de 20px para 35px
+                gap: "35px",
                 width: "100%",
-                maxWidth: "650px", // Largura máxima aumentada sutilmente para acomodar o gap
+                maxWidth: "650px",
                 justifyContent: "center",
               }}
             >
@@ -2037,7 +2283,7 @@ export function Dashboard() {
                   {[
                     "#8A05BE",
                     "#FF7A00",
-                    "#FFC107", // Amarelo adicionado aqui!
+                    "#FFC107",
                     "#107c10",
                     "#0277bd",
                     "#111111",
@@ -2142,7 +2388,7 @@ const translations = {
     newTransaction: "Registrar Nova Transação",
     income: "Entrada",
     expense: "Saída",
-    descPlaceholder: "Descrição (ex: Mercado)",
+    descPlaceholder: "Ex: Mercado",
     valPlaceholder: "0,00",
     btnRegister: "Registrar",
     history: "Últimas Transações",
@@ -2166,6 +2412,10 @@ const translations = {
     cardColor: "Cor do Cartão",
     cancel: "Cancelar",
     save: "Salvar",
+    accountBalance: "Saldo em Conta", // ATUALIZADO
+    descriptionLabel: "Descrição",
+    valueLabel: "Valor",
+    paymentHistoryLabel: "Forma de Pagamento",
     months: [
       "Janeiro",
       "Fevereiro",
@@ -2206,7 +2456,7 @@ const translations = {
     newTransaction: "New Transaction",
     income: "Income",
     expense: "Expense",
-    descPlaceholder: "Description (ex: Grocery)",
+    descPlaceholder: "Ex: Grocery",
     valPlaceholder: "0.00",
     btnRegister: "Register",
     history: "Recent Transactions",
@@ -2230,6 +2480,10 @@ const translations = {
     cardColor: "Card Color",
     cancel: "Cancel",
     save: "Save",
+    accountBalance: "Account Balance",
+    descriptionLabel: "Description",
+    valueLabel: "Value",
+    paymentHistoryLabel: "Payment Method",
     months: [
       "January",
       "February",
@@ -2270,7 +2524,7 @@ const translations = {
     newTransaction: "Nueva Transacción",
     income: "Ingreso",
     expense: "Gasto",
-    descPlaceholder: "Descripción (ej: Mercado)",
+    descPlaceholder: "Ej: Mercado",
     valPlaceholder: "0,00",
     btnRegister: "Registrar",
     history: "Últimas Transações",
@@ -2294,6 +2548,10 @@ const translations = {
     cardColor: "Color de Tarjeta",
     cancel: "Cancelar",
     save: "Guardar",
+    accountBalance: "Saldo en Cuenta",
+    descriptionLabel: "Descripción",
+    valueLabel: "Valor",
+    paymentHistoryLabel: "Método de Pago",
     months: [
       "Enero",
       "Febrero",
@@ -2334,7 +2592,7 @@ const translations = {
     newTransaction: "Nouvelle Transaction",
     income: "Revenu",
     expense: "Dépense",
-    descPlaceholder: "Description (ex: Marché)",
+    descPlaceholder: "Ex: Marché",
     valPlaceholder: "0,00",
     btnRegister: "Enregistrer",
     history: "Dernières Transactions",
@@ -2358,6 +2616,10 @@ const translations = {
     cardColor: "Couleur de la Carte",
     cancel: "Annuler",
     save: "Sauvegarder",
+    accountBalance: "Solde du Compte",
+    descriptionLabel: "Description",
+    valueLabel: "Valeur",
+    paymentHistoryLabel: "Méthode de Paiement",
     months: [
       "Janvier",
       "Février",
@@ -2398,7 +2660,7 @@ const translations = {
     newTransaction: "Neue Transaktion",
     income: "Einnahme",
     expense: "Ausgabe",
-    descPlaceholder: "Beschreibung (z.B. Markt)",
+    descPlaceholder: "Bsp: Markt",
     valPlaceholder: "0,00",
     btnRegister: "Registrieren",
     history: "Letzte Transaktionen",
@@ -2423,6 +2685,10 @@ const translations = {
     cardColor: "Kartenfarbe",
     cancel: "Abbrechen",
     save: "Speichern",
+    accountBalance: "Kontostand",
+    descriptionLabel: "Beschreibung",
+    valueLabel: "Wert",
+    paymentHistoryLabel: "Zahlungsmethode",
     months: [
       "Januar",
       "Februar",
@@ -2463,7 +2729,7 @@ const translations = {
     newTransaction: "Nuova Transazione",
     income: "Entrata",
     expense: "Uscita",
-    descPlaceholder: "Descrizione (es: Mercato)",
+    descPlaceholder: "Es: Mercato",
     valPlaceholder: "0,00",
     btnRegister: "Registra",
     history: "Ultime Transazioni",
@@ -2487,6 +2753,10 @@ const translations = {
     cardColor: "Colore Carta",
     cancel: "Annulla",
     save: "Salva",
+    accountBalance: "Saldo in Conto",
+    descriptionLabel: "Descrizione",
+    valueLabel: "Valore",
+    paymentHistoryLabel: "Metodo di Pagamento",
     months: [
       "Gennaio",
       "Febbraio",
@@ -2527,7 +2797,7 @@ const translations = {
     newTransaction: "新規取引",
     income: "収入",
     expense: "支出",
-    descPlaceholder: "説明 (例: スーパー)",
+    descPlaceholder: "例: スーパー",
     valPlaceholder: "0.00",
     btnRegister: "登録",
     history: "最近の取引",
@@ -2551,6 +2821,10 @@ const translations = {
     cardColor: "カードの色",
     cancel: "キャンセル",
     save: "保存",
+    accountBalance: "口座残高",
+    descriptionLabel: "説明",
+    valueLabel: "価値",
+    paymentHistoryLabel: "支払方法",
     months: [
       "1月",
       "2月",
@@ -2591,7 +2865,7 @@ const translations = {
     newTransaction: "新交易",
     income: "收入",
     expense: "支出",
-    descPlaceholder: "描述 (例: 超市)",
+    descPlaceholder: "例: 超市",
     valPlaceholder: "0.00",
     btnRegister: "注册",
     history: "最近交易",
@@ -2615,6 +2889,10 @@ const translations = {
     cardColor: "卡片颜色",
     cancel: "取消",
     save: "保存",
+    accountBalance: "账户余额",
+    descriptionLabel: "描述",
+    valueLabel: "价值",
+    paymentHistoryLabel: "支付方式",
     months: [
       "一月",
       "二月",
@@ -2655,7 +2933,7 @@ const translations = {
     newTransaction: "새 거래",
     income: "수입",
     expense: "지출",
-    descPlaceholder: "설명 (예: 시장)",
+    descPlaceholder: "예: 마트",
     valPlaceholder: "0.00",
     btnRegister: "등록",
     history: "최근 거래",
@@ -2679,6 +2957,10 @@ const translations = {
     cardColor: "카드 색상",
     cancel: "취소",
     save: "저장",
+    accountBalance: "계좌 잔액",
+    descriptionLabel: "설명",
+    valueLabel: "가치",
+    paymentHistoryLabel: "결제 방법",
     months: [
       "1월",
       "2월",
