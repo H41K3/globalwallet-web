@@ -78,9 +78,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const [isPermanentlyShown, setIsPermanentlyShown] = useState(false);
-  const [isTemporarilyShown, setIsTemporarilyShown] = useState(false);
-  const isPasswordVisible = isPermanentlyShown || isTemporarilyShown;
+  // Apenas um estado simples de visibilidade
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("idioma", idioma);
@@ -110,7 +109,7 @@ export function Login() {
       const response = await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/auth/login",
         {
-          cpf: cpf.replace(/\D/g, ""), 
+          cpf: cpf.replace(/\D/g, ""),
           password: password,
         },
       );
@@ -120,7 +119,7 @@ export function Login() {
         localStorage.setItem("abaAtiva", "home");
         navigate("/dashboard");
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       setError(t.errorInvalid);
     }
@@ -371,12 +370,16 @@ export function Login() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  WebkitUserSelect: "none", // Previne seleção no mobile
+                  userSelect: "none",
+                  WebkitTapHighlightColor: "transparent",
                 }}
-                onClick={() => setIsPermanentlyShown((prev) => !prev)}
-                onMouseEnter={() => setIsTemporarilyShown(true)}
-                onMouseLeave={() => setIsTemporarilyShown(false)}
-                onTouchStart={() => setIsTemporarilyShown(true)}
-                onTouchEnd={() => setIsTemporarilyShown(false)}
+                onMouseDown={() => setIsPasswordVisible(true)}
+                onMouseUp={() => setIsPasswordVisible(false)}
+                onMouseLeave={() => setIsPasswordVisible(false)}
+                onTouchStart={() => setIsPasswordVisible(true)}
+                onTouchEnd={() => setIsPasswordVisible(false)}
+                onContextMenu={(e) => e.preventDefault()} // Previne o menu de opções ao segurar o toque
               >
                 {isPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
               </button>
@@ -423,7 +426,17 @@ export function Login() {
 const translations = {
   pt: {
     flag: "🇧🇷",
-    langs: { pt: "Português", en: "Inglês", es: "Espanhol", fr: "Francês", de: "Alemão", it: "Italiano", ja: "Japonês", zh: "Chinês", ko: "Coreano" },
+    langs: {
+      pt: "Português",
+      en: "Inglês",
+      es: "Espanhol",
+      fr: "Francês",
+      de: "Alemão",
+      it: "Italiano",
+      ja: "Japonês",
+      zh: "Chinês",
+      ko: "Coreano",
+    },
     title: "GlobalWallet",
     cpfLabel: "CPF",
     passwordLabel: "Senha",
@@ -434,7 +447,17 @@ const translations = {
   },
   en: {
     flag: "🇺🇸",
-    langs: { pt: "Portuguese", en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian", ja: "Japanese", zh: "Chinese", ko: "Korean" },
+    langs: {
+      pt: "Portuguese",
+      en: "English",
+      es: "Spanish",
+      fr: "French",
+      de: "German",
+      it: "Italian",
+      ja: "Japanese",
+      zh: "Chinese",
+      ko: "Korean",
+    },
     title: "GlobalWallet",
     cpfLabel: "ID / CPF",
     passwordLabel: "Password",
@@ -445,7 +468,17 @@ const translations = {
   },
   es: {
     flag: "🇪🇸",
-    langs: { pt: "Portugués", en: "Inglés", es: "Español", fr: "Francés", de: "Alemán", it: "Italiano", ja: "Japonés", zh: "Chino", ko: "Coreano" },
+    langs: {
+      pt: "Portugués",
+      en: "Inglés",
+      es: "Español",
+      fr: "Francés",
+      de: "Alemán",
+      it: "Italiano",
+      ja: "Japonés",
+      zh: "Chino",
+      ko: "Coreano",
+    },
     title: "GlobalWallet",
     cpfLabel: "Identificación / CPF",
     passwordLabel: "Contraseña",
@@ -456,7 +489,17 @@ const translations = {
   },
   fr: {
     flag: "🇫🇷",
-    langs: { pt: "Portugais", en: "Anglais", es: "Espagnol", fr: "Français", de: "Allemand", it: "Italien", ja: "Japonais", zh: "Chinois", ko: "Coréen" },
+    langs: {
+      pt: "Portugais",
+      en: "Anglais",
+      es: "Espagnol",
+      fr: "Français",
+      de: "Allemand",
+      it: "Italien",
+      ja: "Japonais",
+      zh: "Chinois",
+      ko: "Coréen",
+    },
     title: "GlobalWallet",
     cpfLabel: "ID / CPF",
     passwordLabel: "Mot de passe",
@@ -467,7 +510,17 @@ const translations = {
   },
   de: {
     flag: "🇩🇪",
-    langs: { pt: "Portugiesisch", en: "Englisch", es: "Spanisch", fr: "Französisch", de: "Deutsch", it: "Italienisch", ja: "Japanisch", zh: "Chinesisch", ko: "Koreanisch" },
+    langs: {
+      pt: "Portugiesisch",
+      en: "Englisch",
+      es: "Spanisch",
+      fr: "Französisch",
+      de: "Deutsch",
+      it: "Italienisch",
+      ja: "Japanisch",
+      zh: "Chinesisch",
+      ko: "Koreanisch",
+    },
     title: "GlobalWallet",
     cpfLabel: "Ausweis / CPF",
     passwordLabel: "Passwort",
@@ -478,7 +531,17 @@ const translations = {
   },
   it: {
     flag: "🇮🇹",
-    langs: { pt: "Portoghese", en: "Inglese", es: "Spagnolo", fr: "Francese", de: "Tedesco", it: "Italiano", ja: "Giapponese", zh: "Cinese", ko: "Coreano" },
+    langs: {
+      pt: "Portoghese",
+      en: "Inglese",
+      es: "Spagnolo",
+      fr: "Francese",
+      de: "Tedesco",
+      it: "Italiano",
+      ja: "Giapponese",
+      zh: "Cinese",
+      ko: "Coreano",
+    },
     title: "GlobalWallet",
     cpfLabel: "Documento / CPF",
     passwordLabel: "Password",
@@ -489,7 +552,17 @@ const translations = {
   },
   ja: {
     flag: "🇯🇵",
-    langs: { pt: "ポルトガル語", en: "英語", es: "スペイン語", fr: "フランス語", de: "ドイツ語", it: "イタリア語", ja: "日本語", zh: "中国語", ko: "韓国語" },
+    langs: {
+      pt: "ポルトガル語",
+      en: "英語",
+      es: "スペイン語",
+      fr: "フランス語",
+      de: "ドイツ語",
+      it: "イタリア語",
+      ja: "日本語",
+      zh: "中国語",
+      ko: "韓国語",
+    },
     title: "GlobalWallet",
     cpfLabel: "身分証明書 / CPF",
     passwordLabel: "パスワード",
@@ -500,7 +573,17 @@ const translations = {
   },
   zh: {
     flag: "🇨🇳",
-    langs: { pt: "葡萄牙语", en: "英语", es: "西班牙语", fr: "法语", de: "德语", it: "意大利语", ja: "日语", zh: "中文", ko: "韩语" },
+    langs: {
+      pt: "葡萄牙语",
+      en: "英语",
+      es: "西班牙语",
+      fr: "法语",
+      de: "德语",
+      it: "意大利语",
+      ja: "日语",
+      zh: "中文",
+      ko: "韩语",
+    },
     title: "GlobalWallet",
     cpfLabel: "身份证 / CPF",
     passwordLabel: "密码",
@@ -511,7 +594,17 @@ const translations = {
   },
   ko: {
     flag: "🇰🇷",
-    langs: { pt: "포르투갈어", en: "英語", es: "スペイン語", fr: "フランス語", de: "ドイツ語", it: "イタリア語", ja: "日本語", zh: "中国語", ko: "한국어" },
+    langs: {
+      pt: "포르투갈어",
+      en: "英語",
+      es: "スペイン語",
+      fr: "フランス語",
+      de: "ドイツ語",
+      it: "イタリア語",
+      ja: "日本語",
+      zh: "中国語",
+      ko: "한국어",
+    },
     title: "GlobalWallet",
     cpfLabel: "신분증 / CPF",
     passwordLabel: "비밀번호",

@@ -85,16 +85,10 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const [isPermanentlyShown, setIsPermanentlyShown] = useState(false);
-  const [isTemporarilyShown, setIsTemporarilyShown] = useState(false);
-  const isPasswordVisible = isPermanentlyShown || isTemporarilyShown;
-
-  const [isConfirmPermanentlyShown, setIsConfirmPermanentlyShown] =
+  // Estados simplificados para a visualização das senhas
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
     useState(false);
-  const [isConfirmTemporarilyShown, setIsConfirmTemporarilyShown] =
-    useState(false);
-  const isConfirmPasswordVisible =
-    isConfirmPermanentlyShown || isConfirmTemporarilyShown;
 
   useEffect(() => {
     localStorage.setItem("idioma", idioma);
@@ -548,12 +542,16 @@ export function Register() {
                     cursor: "pointer",
                     display: "flex",
                     padding: "2px",
+                    WebkitUserSelect: "none",
+                    userSelect: "none",
+                    WebkitTapHighlightColor: "transparent",
                   }}
-                  onClick={() => setIsPermanentlyShown((prev) => !prev)}
-                  onMouseEnter={() => setIsTemporarilyShown(true)}
-                  onMouseLeave={() => setIsTemporarilyShown(false)}
-                  onTouchStart={() => setIsTemporarilyShown(true)}
-                  onTouchEnd={() => setIsTemporarilyShown(false)}
+                  onMouseDown={() => setIsPasswordVisible(true)}
+                  onMouseUp={() => setIsPasswordVisible(false)}
+                  onMouseLeave={() => setIsPasswordVisible(false)}
+                  onTouchStart={() => setIsPasswordVisible(true)}
+                  onTouchEnd={() => setIsPasswordVisible(false)}
+                  onContextMenu={(e) => e.preventDefault()}
                 >
                   {isPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
                 </button>
@@ -602,12 +600,16 @@ export function Register() {
                     cursor: "pointer",
                     display: "flex",
                     padding: "2px",
+                    WebkitUserSelect: "none",
+                    userSelect: "none",
+                    WebkitTapHighlightColor: "transparent",
                   }}
-                  onClick={() => setIsConfirmPermanentlyShown((prev) => !prev)}
-                  onMouseEnter={() => setIsConfirmTemporarilyShown(true)}
-                  onMouseLeave={() => setIsConfirmTemporarilyShown(false)}
-                  onTouchStart={() => setIsConfirmTemporarilyShown(true)}
-                  onTouchEnd={() => setIsConfirmTemporarilyShown(false)}
+                  onMouseDown={() => setIsConfirmPasswordVisible(true)}
+                  onMouseUp={() => setIsConfirmPasswordVisible(false)}
+                  onMouseLeave={() => setIsConfirmPasswordVisible(false)}
+                  onTouchStart={() => setIsConfirmPasswordVisible(true)}
+                  onTouchEnd={() => setIsConfirmPasswordVisible(false)}
+                  onContextMenu={(e) => e.preventDefault()}
                 >
                   {isConfirmPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
                 </button>
