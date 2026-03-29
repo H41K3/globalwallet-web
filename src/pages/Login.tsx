@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
-// Puxando o seu logo.png normal
-import logoImg from "../assets/logo.png";
 import bgImg from "../assets/loginbackground.png";
 
-// LOGO REVERTIDA: Caixa branca, cantos arredondados, sombra e scale(1.3)
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+
 const AppLogo = ({ size = 45 }: { size?: number }) => (
   <div
     style={{
@@ -22,8 +21,8 @@ const AppLogo = ({ size = 45 }: { size?: number }) => (
     }}
   >
     <img
-      src={logoImg}
-      alt="Logo GlobalWallet"
+      src="/logo.png"
+      alt="Logo"
       style={{
         height: "100%",
         width: "100%",
@@ -67,13 +66,42 @@ const EyeSlashIcon = () => (
 
 export function Login() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+
+  const [idioma, setIdioma] = useState<IdiomaType>(
+    (localStorage.getItem("idioma") as IdiomaType) || "en",
+  );
+  const [menuIdiomaAberto, setMenuIdiomaAberto] = useState(false);
+  const menuIdiomaRef = useRef<HTMLDivElement>(null);
+  const t = translations[idioma];
+
+  const [cpf, setCpf] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [isPermanentlyShown, setIsPermanentlyShown] = useState(false);
   const [isTemporarilyShown, setIsTemporarilyShown] = useState(false);
   const isPasswordVisible = isPermanentlyShown || isTemporarilyShown;
+
+  useEffect(() => {
+    localStorage.setItem("idioma", idioma);
+  }, [idioma]);
+
+  useEffect(() => {
+    const handleClickFora = (event: MouseEvent) => {
+      if (
+        menuIdiomaRef.current &&
+        !menuIdiomaRef.current.contains(event.target as Node)
+      ) {
+        setMenuIdiomaAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, []);
+
+  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
+    (a, b) => t.langs[a].localeCompare(t.langs[b]),
+  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,21 +110,19 @@ export function Login() {
       const response = await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/auth/login",
         {
-          login: username,
+          cpf: cpf.replace(/\D/g, ""), 
           password: password,
         },
       );
       const token = response.data.token || response.data;
       if (token) {
         localStorage.setItem("token", token);
-        localStorage.setItem("usuario", username);
-        // CORREÇÃO AQUI: Força a aba inicial sempre ser a 'home' no login
         localStorage.setItem("abaAtiva", "home");
         navigate("/dashboard");
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
-      setError("Usuário ou senha inválidos.");
+      setError(t.errorInvalid);
     }
   };
 
@@ -118,7 +144,6 @@ export function Login() {
         boxSizing: "border-box",
       }}
     >
-      {/* CAMADA DE FUNDO */}
       <div
         style={{
           position: "absolute",
@@ -150,12 +175,83 @@ export function Login() {
         }}
       >
         <div
+          ref={menuIdiomaRef}
+          style={{ position: "absolute", top: "20px", right: "20px" }}
+        >
+          <button
+            onClick={() => setMenuIdiomaAberto(!menuIdiomaAberto)}
+            style={{
+              background: "#f5f5f5",
+              border: "1px solid #eaeaea",
+              borderRadius: "22px",
+              padding: "6px 10px",
+              fontSize: "1rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              color: "#333",
+            }}
+          >
+            {t.flag} <span style={{ fontSize: "0.7rem", opacity: 0.8 }}>▼</span>
+          </button>
+          {menuIdiomaAberto && (
+            <div
+              style={{
+                position: "absolute",
+                top: "40px",
+                right: 0,
+                backgroundColor: "#fff",
+                borderRadius: "12px",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                padding: "10px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "8px",
+                zIndex: 1001,
+                minWidth: "220px",
+              }}
+            >
+              {idiomasOrdenados.map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => {
+                    setIdioma(lang);
+                    setMenuIdiomaAberto(false);
+                  }}
+                  style={{
+                    background: idioma === lang ? "#f5f5f5" : "transparent",
+                    border: "none",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "0.85rem",
+                    color: "#333",
+                    textAlign: "left",
+                    fontWeight: idioma === lang ? "bold" : "normal",
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>
+                    {translations[lang].flag}
+                  </span>{" "}
+                  {t.langs[lang]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "15px",
             marginBottom: "2.5rem",
+            marginTop: "1rem",
           }}
         >
           <AppLogo />
@@ -168,7 +264,7 @@ export function Login() {
               letterSpacing: "0.5px",
             }}
           >
-            GlobalWallet
+            {t.title}
           </h1>
         </div>
 
@@ -176,7 +272,7 @@ export function Login() {
           <div
             style={{
               backgroundColor: "#ffebee",
-              color: "#EC0000",
+              color: "#d91616",
               padding: "12px",
               borderRadius: "10px",
               marginBottom: "1.5rem",
@@ -203,19 +299,27 @@ export function Login() {
                 textTransform: "uppercase",
               }}
             >
-              Nome de usuário
+              {t.cpfLabel}
             </label>
             <input
               type="text"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              maxLength={14}
+              value={cpf}
+              onChange={(e) => {
+                let v = e.target.value.replace(/\D/g, "");
+                if (v.length > 11) v = v.slice(0, 11);
+                v = v.replace(/(\d{3})(\d)/, "$1.$2");
+                v = v.replace(/(\d{3})(\d)/, "$1.$2");
+                v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+                setCpf(v);
+              }}
               style={{
                 width: "100%",
                 padding: "12px 16px",
                 borderRadius: "12px",
                 border: "1px solid #eaeaea",
-                backgroundColor: "#fafafa",
+                backgroundColor: "transparent",
                 outline: "none",
                 fontSize: "0.95rem",
                 boxSizing: "border-box",
@@ -234,7 +338,7 @@ export function Login() {
                 textTransform: "uppercase",
               }}
             >
-              Senha
+              {t.passwordLabel}
             </label>
             <div style={{ position: "relative", width: "100%" }}>
               <input
@@ -247,7 +351,7 @@ export function Login() {
                   padding: "12px 42px 12px 16px",
                   borderRadius: "12px",
                   border: "1px solid #eaeaea",
-                  backgroundColor: "#fafafa",
+                  backgroundColor: "transparent",
                   outline: "none",
                   fontSize: "0.95rem",
                   boxSizing: "border-box",
@@ -269,13 +373,12 @@ export function Login() {
                   justifyContent: "center",
                 }}
                 onClick={() => setIsPermanentlyShown((prev) => !prev)}
-                onMouseDown={() => setIsTemporarilyShown(true)}
-                onMouseUp={() => setIsTemporarilyShown(false)}
+                onMouseEnter={() => setIsTemporarilyShown(true)}
                 onMouseLeave={() => setIsTemporarilyShown(false)}
                 onTouchStart={() => setIsTemporarilyShown(true)}
                 onTouchEnd={() => setIsTemporarilyShown(false)}
               >
-                {isPermanentlyShown ? <EyeIcon /> : <EyeSlashIcon />}
+                {isPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
               </button>
             </div>
           </div>
@@ -285,7 +388,7 @@ export function Login() {
             style={{
               marginTop: "1.5rem",
               padding: "14px 20px",
-              backgroundColor: "#EC0000",
+              backgroundColor: "#d91616",
               color: "white",
               border: "none",
               borderRadius: "15px",
@@ -293,34 +396,128 @@ export function Login() {
               cursor: "pointer",
               fontSize: "1.0rem",
               width: "100%",
-              boxShadow: "0 5px 15px rgba(236,0,0,0.25)",
             }}
           >
-            Entrar
+            {t.loginBtn}
           </button>
         </form>
 
-        <p
-          style={{
-            marginTop: "2rem",
-            fontSize: "0.9rem",
-            color: "#666",
-            margin: "2rem 0 0 0",
-          }}
-        >
-          Não tem uma conta?{" "}
+        <p style={{ marginTop: "2rem", fontSize: "0.9rem", color: "#666" }}>
+          {t.noAccount}{" "}
           <Link
             to="/register"
             style={{
-              color: "#EC0000",
+              color: "#d91616",
               fontWeight: "600",
               textDecoration: "underline",
             }}
           >
-            Cadastre-se
+            {t.registerLink}
           </Link>
         </p>
       </div>
     </div>
   );
 }
+
+const translations = {
+  pt: {
+    flag: "🇧🇷",
+    langs: { pt: "Português", en: "Inglês", es: "Espanhol", fr: "Francês", de: "Alemão", it: "Italiano", ja: "Japonês", zh: "Chinês", ko: "Coreano" },
+    title: "GlobalWallet",
+    cpfLabel: "CPF",
+    passwordLabel: "Senha",
+    loginBtn: "Entrar",
+    noAccount: "Não tem uma conta?",
+    registerLink: "Cadastre-se",
+    errorInvalid: "CPF ou senha inválidos.",
+  },
+  en: {
+    flag: "🇺🇸",
+    langs: { pt: "Portuguese", en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian", ja: "Japanese", zh: "Chinese", ko: "Korean" },
+    title: "GlobalWallet",
+    cpfLabel: "ID / CPF",
+    passwordLabel: "Password",
+    loginBtn: "Login",
+    noAccount: "Don't have an account?",
+    registerLink: "Sign up",
+    errorInvalid: "Invalid ID or password.",
+  },
+  es: {
+    flag: "🇪🇸",
+    langs: { pt: "Portugués", en: "Inglés", es: "Español", fr: "Francés", de: "Alemán", it: "Italiano", ja: "Japonés", zh: "Chino", ko: "Coreano" },
+    title: "GlobalWallet",
+    cpfLabel: "Identificación / CPF",
+    passwordLabel: "Contraseña",
+    loginBtn: "Entrar",
+    noAccount: "¿No tienes una cuenta?",
+    registerLink: "Regístrate",
+    errorInvalid: "Identificación o contraseña no válidos.",
+  },
+  fr: {
+    flag: "🇫🇷",
+    langs: { pt: "Portugais", en: "Anglais", es: "Espagnol", fr: "Français", de: "Allemand", it: "Italien", ja: "Japonais", zh: "Chinois", ko: "Coréen" },
+    title: "GlobalWallet",
+    cpfLabel: "ID / CPF",
+    passwordLabel: "Mot de passe",
+    loginBtn: "Se connecter",
+    noAccount: "Vous n'avez pas de compte?",
+    registerLink: "S'inscrire",
+    errorInvalid: "ID ou mot de passe invalide.",
+  },
+  de: {
+    flag: "🇩🇪",
+    langs: { pt: "Portugiesisch", en: "Englisch", es: "Spanisch", fr: "Französisch", de: "Deutsch", it: "Italienisch", ja: "Japanisch", zh: "Chinesisch", ko: "Koreanisch" },
+    title: "GlobalWallet",
+    cpfLabel: "Ausweis / CPF",
+    passwordLabel: "Passwort",
+    loginBtn: "Anmelden",
+    noAccount: "Haben Sie kein Konto?",
+    registerLink: "Registrieren",
+    errorInvalid: "Ungültige ID oder Passwort.",
+  },
+  it: {
+    flag: "🇮🇹",
+    langs: { pt: "Portoghese", en: "Inglese", es: "Spagnolo", fr: "Francese", de: "Tedesco", it: "Italiano", ja: "Giapponese", zh: "Cinese", ko: "Coreano" },
+    title: "GlobalWallet",
+    cpfLabel: "Documento / CPF",
+    passwordLabel: "Password",
+    loginBtn: "Accedi",
+    noAccount: "Non hai un account?",
+    registerLink: "Iscriviti",
+    errorInvalid: "ID o password non validi.",
+  },
+  ja: {
+    flag: "🇯🇵",
+    langs: { pt: "ポルトガル語", en: "英語", es: "スペイン語", fr: "フランス語", de: "ドイツ語", it: "イタリア語", ja: "日本語", zh: "中国語", ko: "韓国語" },
+    title: "GlobalWallet",
+    cpfLabel: "身分証明書 / CPF",
+    passwordLabel: "パスワード",
+    loginBtn: "ログイン",
+    noAccount: "アカウントをお持ちではありませんか？",
+    registerLink: "登録",
+    errorInvalid: "無効なIDまたはパスワードです。",
+  },
+  zh: {
+    flag: "🇨🇳",
+    langs: { pt: "葡萄牙语", en: "英语", es: "西班牙语", fr: "法语", de: "德语", it: "意大利语", ja: "日语", zh: "中文", ko: "韩语" },
+    title: "GlobalWallet",
+    cpfLabel: "身份证 / CPF",
+    passwordLabel: "密码",
+    loginBtn: "登录",
+    noAccount: "没有账号？",
+    registerLink: "注册",
+    errorInvalid: "ID或密码无效。",
+  },
+  ko: {
+    flag: "🇰🇷",
+    langs: { pt: "포르투갈어", en: "英語", es: "スペイン語", fr: "フランス語", de: "ドイツ語", it: "イタリア語", ja: "日本語", zh: "中国語", ko: "한국어" },
+    title: "GlobalWallet",
+    cpfLabel: "신분증 / CPF",
+    passwordLabel: "비밀번호",
+    loginBtn: "로그인",
+    noAccount: "계정이 없으신가요?",
+    registerLink: "가입하기",
+    errorInvalid: "유효하지 않은 ID 또는 비밀번호입니다.",
+  },
+};

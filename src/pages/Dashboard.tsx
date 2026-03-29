@@ -2,8 +2,6 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-import logoImg from "../assets/logo.png";
-
 type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
 type AbaType = "home" | "statement" | "cards" | "settings";
 
@@ -28,18 +26,38 @@ interface Cartao {
   color?: string;
 }
 
+type ThemeType = {
+  bgMain: string;
+  bgCard: string;
+  textMain: string;
+  textSec: string;
+  textMuted: string;
+  border: string;
+  inputBg: string;
+  sidebarBg: string;
+  sidebarHover: string;
+  highlightBg: string;
+  shadow: string;
+  green: string;
+  red: string;
+};
+
 // ==========================================
-// CUSTOM COMPONENTS FOR MODERN FORM (INTERNAL)
+// CUSTOM COMPONENTS
 // ==========================================
 
 const CategoryOption = ({
   catKey,
   idiom,
   onSelect,
+  isSelected,
+  theme,
 }: {
   catKey: string;
   idiom: IdiomaType;
   onSelect: () => void;
+  isSelected: boolean;
+  theme: ThemeType;
 }) => {
   const catData = categoryMap[catKey];
   return (
@@ -53,20 +71,21 @@ const CategoryOption = ({
         gap: "10px",
         borderRadius: "8px",
         marginBottom: "2px",
-        backgroundColor: "transparent",
+        backgroundColor: isSelected ? theme.highlightBg : "transparent",
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#f9fafb";
+        if (!isSelected)
+          e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "transparent";
+        if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
       }}
     >
       <span style={{ fontSize: "1.1rem" }}>{catData.emoji}</span>
       <span
         style={{
-          color: "#555",
+          color: isSelected ? theme.textMain : theme.textSec,
           fontSize: "0.85rem",
           fontWeight: "500",
         }}
@@ -82,11 +101,13 @@ const PaymentMethodOption = ({
   t,
   onSelect,
   isSelected,
+  theme,
 }: {
   card?: Cartao;
   t: (typeof translations)["pt"];
   onSelect: () => void;
   isSelected: boolean;
+  theme: ThemeType;
 }) => {
   return (
     <div
@@ -97,13 +118,14 @@ const PaymentMethodOption = ({
         display: "flex",
         alignItems: "center",
         gap: "10px",
-        backgroundColor: isSelected ? "#f4f6f8" : "transparent",
+        backgroundColor: isSelected ? theme.highlightBg : "transparent",
         borderRadius: "8px",
         marginBottom: "2px",
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb";
+        if (!isSelected)
+          e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
         if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
@@ -122,7 +144,7 @@ const PaymentMethodOption = ({
           <span
             style={{
               fontWeight: isSelected ? "600" : "500",
-              color: isSelected ? "#111" : "#555",
+              color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
           >
@@ -135,24 +157,13 @@ const PaymentMethodOption = ({
           <span
             style={{
               fontWeight: isSelected ? "600" : "500",
-              color: isSelected ? "#111" : "#555",
+              color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
           >
             {t.accountBalance}
           </span>
         </>
-      )}
-      {isSelected && (
-        <span
-          style={{
-            marginLeft: "auto",
-            color: "#EC0000",
-            fontSize: "0.85rem",
-          }}
-        >
-          ✔
-        </span>
       )}
     </div>
   );
@@ -162,28 +173,103 @@ export function Dashboard() {
   const navigate = useNavigate();
 
   // ==========================================
-  // 1. ESTADOS GLOBAIS
+  // 1. ESTADOS GLOBAIS E TEMA
   // ==========================================
   const [abaAtiva, setAbaAtiva] = useState<AbaType>(
     (localStorage.getItem("abaAtiva") as AbaType) || "home",
   );
+
   const [idioma, setIdioma] = useState<IdiomaType>(
-    (localStorage.getItem("idioma") as IdiomaType) || "pt",
+    (localStorage.getItem("idioma") as IdiomaType) || "en",
   );
+
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => localStorage.getItem("theme") === "dark",
+  );
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [menuAberto, setMenuAberto] = useState(false);
-  const [menuIdiomaAberto, setMenuIdiomaAberto] = useState(false);
   const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">(
     "BRL",
   );
   const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
 
-  const menuIdiomaRef = useRef<HTMLDivElement>(null);
-  const nomeUsuario = localStorage.getItem("usuario") || "haike_dev";
   const t = translations[idioma];
 
+  const theme: ThemeType = isDarkMode
+    ? {
+        bgMain: "#222222",
+        bgCard: "#2d2d2d",
+        textMain: "#f5f5f5",
+        textSec: "#a0a0a0",
+        textMuted: "#777",
+        border: "#444",
+        inputBg: "#2a2a2a",
+        sidebarBg: "#222222",
+        sidebarHover: "#2c2c2c",
+        highlightBg: "#3d3d3d",
+        shadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+        green: "#4caf50",
+        red: "#ef5350",
+      }
+    : {
+        bgMain: "#f0f2f5",
+        bgCard: "#fff",
+        textMain: "#111",
+        textSec: "#555",
+        textMuted: "#888",
+        border: "#eaeaea",
+        inputBg: "#fafafa",
+        sidebarBg: "#fff",
+        sidebarHover: "#f5f5f5",
+        highlightBg: "#ebebeb",
+        shadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+        green: "#107c10",
+        red: "#d91616",
+      };
+
   // ==========================================
-  // 2. ESTADOS: INÍCIO (HOME)
+  // UX - LOADING E TOASTS
   // ==========================================
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({
+    show: false,
+    message: "",
+    type: "success",
+  });
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
+  // ==========================================
+  // ESTADOS RESTANTES
+  // ==========================================
+  const [perfilUsuario, setPerfilUsuario] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+  });
+
+  const nomeUsuario = localStorage.getItem("usuario") || "";
+  const primeiroNome = perfilUsuario.fullName
+    ? perfilUsuario.fullName.split(" ")[0]
+    : nomeUsuario;
+
   const [saldo, setSaldo] = useState<number | null>(null);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [novaDescricao, setNovaDescricao] = useState("");
@@ -200,20 +286,13 @@ export function Dashboard() {
   const [menuCartaoAberto, setMenuCartaoAberto] = useState(false);
   const menuCartaoRef = useRef<HTMLDivElement>(null);
 
-  // ==========================================
-  // 3. ESTADOS: EXTRATO DETALHADO
-  // ==========================================
   const dataAtual = new Date();
   const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
   const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
-
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState<number>(dataAtual.getFullYear());
   const monthPickerRef = useRef<HTMLDivElement>(null);
 
-  // ==========================================
-  // 4. ESTADOS: MEUS CARTÕES
-  // ==========================================
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [novoCartaoNome, setNovoCartaoNome] = useState("");
@@ -221,22 +300,19 @@ export function Dashboard() {
   const [novoCartaoLimite, setNovoCartaoLimite] = useState("");
   const [novoCartaoCor, setNovoCartaoCor] = useState("#8A05BE");
 
-  // ==========================================
-  // 5. ESTADOS: CONFIGURAÇÕES
-  // ==========================================
-  const [isDarkMode, setIsDarkMode] = useState(
-    () => localStorage.getItem("theme") === "dark",
-  );
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
-  const [feedbackSenha, setFeedbackSenha] = useState({
-    mensagem: "",
-    tipo: "",
-  });
+
   // ==========================================
-  // EFEITOS (LIFECYCLE)
+  // EFEITOS E FUNÇÕES
   // ==========================================
+
+  useEffect(() => {
+    document.body.style.backgroundColor = theme.bgMain;
+    document.body.style.margin = "0";
+  }, [theme.bgMain]);
+
   useEffect(() => {
     localStorage.setItem("abaAtiva", abaAtiva);
   }, [abaAtiva]);
@@ -246,19 +322,17 @@ export function Dashboard() {
   }, [idioma]);
 
   useEffect(() => {
-    buscarTudo();
-    buscarCotacoes();
-    buscarCartoes();
+    const carregarDadosIniciais = async () => {
+      setIsLoading(true);
+      await Promise.all([buscarTudo(), buscarCotacoes(), buscarCartoes()]);
+      setIsLoading(false);
+    };
+    carregarDadosIniciais();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const handleClickFora = (event: MouseEvent) => {
-      if (
-        menuIdiomaRef.current &&
-        !menuIdiomaRef.current.contains(event.target as Node)
-      )
-        setMenuIdiomaAberto(false);
       if (
         menuCategoriaRef.current &&
         !menuCategoriaRef.current.contains(event.target as Node)
@@ -286,86 +360,64 @@ export function Dashboard() {
         tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
       );
     }
-    if (tipoTransacaoSelecionado === "INCOME") {
-      setCartaoSelecionadoId("");
-    }
+    if (tipoTransacaoSelecionado === "INCOME") setCartaoSelecionadoId("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoTransacaoSelecionado]);
 
-  // ==========================================
-  // FUNÇÃO DE TROCA DE SENHA
-  // ==========================================
   const handleMudarSenha = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFeedbackSenha({ mensagem: "", tipo: "" });
 
-    // 1. Validação: Senha nova não pode ser igual à atual
     if (novaSenha === senhaAtual) {
-      setFeedbackSenha({
-        mensagem: "A nova senha deve ser diferente da atual.",
-        tipo: "erro",
-      });
+      showToast(
+        t.errorSamePassword || "A nova senha deve ser diferente da atual.",
+        "error",
+      );
       return;
     }
-
-    // 2. Validação: Senhas novas não batem
     if (novaSenha !== confirmarNovaSenha) {
-      setFeedbackSenha({
-        mensagem: "As novas senhas não coincidem.",
-        tipo: "erro",
-      });
+      showToast(t.errorMismatch, "error");
       return;
     }
-
-    // 3. Validação: Tamanho mínimo (Opcional, geralmente é bom ter)
     if (novaSenha.length < 6) {
-      setFeedbackSenha({
-        mensagem: "A senha deve ter no mínimo 6 caracteres.",
-        tipo: "erro",
-      });
+      showToast(
+        t.errorShortPassword || "A senha deve ter no mínimo 6 caracteres.",
+        "error",
+      );
       return;
     }
 
     try {
+      setIsLoading(true);
       const token = localStorage.getItem("token");
-
-      // ATENÇÃO: Esta é uma rota padrão. Verifique se o seu Backend (Java/Node)
-      // tem essa rota exata configurada para receber PUT e alterar a senha!
       await axios.put(
         "https://swiss-project-api.onrender.com/api/v1/auth/change-password",
-        {
-          currentPassword: senhaAtual,
-          newPassword: novaSenha,
-        },
+        { currentPassword: senhaAtual, newPassword: novaSenha },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-
-      // Sucesso!
-      setFeedbackSenha({
-        mensagem: "Senha atualizada com sucesso!",
-        tipo: "sucesso",
-      });
+      showToast(
+        t.successPasswordUpdate || "Senha atualizada com sucesso!",
+        "success",
+      );
       setSenhaAtual("");
       setNovaSenha("");
       setConfirmarNovaSenha("");
     } catch (erro) {
       console.error(erro);
-      setFeedbackSenha({
-        mensagem:
+      showToast(
+        t.errorPasswordUpdate ||
           "Erro ao trocar senha. Verifique se a senha atual está correta.",
-        tipo: "erro",
-      });
+        "error",
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ==========================================
-  // FUNÇÕES GLOBAIS E API
-  // ==========================================
   const buscarTudo = async () => {
     const token = localStorage.getItem("token");
     if (!token) return navigate("/");
     try {
-      const [resSaldo, resTrans] = await Promise.all([
+      const [resSaldo, resTrans, resPerfil] = await Promise.all([
         axios.get(
           "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
           { headers: { Authorization: `Bearer ${token}` } },
@@ -374,6 +426,9 @@ export function Dashboard() {
           "https://swiss-project-api.onrender.com/api/v1/transactions",
           { headers: { Authorization: `Bearer ${token}` } },
         ),
+        axios.get("https://swiss-project-api.onrender.com/api/v1/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       setSaldo(
         resSaldo.data.balance !== undefined
@@ -385,6 +440,7 @@ export function Dashboard() {
           ? resTrans.data
           : resTrans.data.content || [],
       );
+      if (resPerfil && resPerfil.data) setPerfilUsuario(resPerfil.data);
     } catch (erro) {
       console.error(erro);
       navigate("/");
@@ -410,10 +466,6 @@ export function Dashboard() {
     window.location.reload();
   };
 
-  // ==========================================
-  // FUNÇÕES: INÍCIO (HOME)
-  // ==========================================
-
   const handleDescricaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNovaDescricao(e.target.value);
   };
@@ -427,7 +479,10 @@ export function Dashboard() {
     const token = localStorage.getItem("token");
     try {
       const valorNumerico = Math.abs(parseFloat(novoValor.replace(",", ".")));
-      if (isNaN(valorNumerico)) return alert(t.errorValue);
+      if (isNaN(valorNumerico)) {
+        showToast(t.errorValue, "error");
+        return;
+      }
 
       let valorParaSalvar = valorNumerico;
       if (moedaExibicao === "USD" && cotacoes.usd > 0)
@@ -437,6 +492,7 @@ export function Dashboard() {
 
       const dataSeguraParaBanco = new Date().toISOString().split("T")[0];
 
+      setIsLoading(true);
       await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/transactions",
         {
@@ -450,44 +506,47 @@ export function Dashboard() {
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-
       setNovaDescricao("");
       setNovoValor("");
       setCartaoSelecionadoId("");
-      buscarTudo();
-      buscarCartoes();
+      await buscarTudo();
+      await buscarCartoes();
+      showToast("Transação registrada com sucesso!", "success");
     } catch (erro) {
       console.error(erro);
-      alert("Erro ao salvar! Verifique o servidor.");
+      showToast("Erro ao salvar! Verifique o servidor.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteTransaction = async (id?: number) => {
     if (!id || !window.confirm(t.confirmDelete)) return;
     try {
+      setIsLoading(true);
       await axios.delete(
         `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
-      buscarTudo();
-      buscarCartoes();
+      await buscarTudo();
+      await buscarCartoes();
+      showToast("Transação excluída!", "success");
     } catch (erro) {
       console.error(erro);
+      showToast("Erro ao excluir transação.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ==========================================
-  // FUNÇÕES: EXTRATO DETALHADO
-  // ==========================================
   const handleMesAnterior = () => {
     if (mesFiltro === 1) {
       setMesFiltro(12);
       setAnoFiltro(anoFiltro - 1);
     } else setMesFiltro(mesFiltro - 1);
   };
-
   const handleMesSeguinte = () => {
     if (mesFiltro === 12) {
       setMesFiltro(1);
@@ -524,8 +583,8 @@ export function Dashboard() {
           label,
           items: [],
           color: isCard
-            ? transacao.card?.color || transacao.card?.cor || "#333"
-            : "#107c10",
+            ? transacao.card?.color || transacao.card?.cor || theme.textMain
+            : theme.green,
         };
       }
       grupos[key].items.push(transacao);
@@ -534,18 +593,13 @@ export function Dashboard() {
     {} as Record<string, { label: string; items: Transacao[]; color: string }>,
   );
 
-  // ==========================================
-  // FUNÇÕES: MEUS CARTÕES
-  // ==========================================
   const buscarCartoes = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
       const resposta = await axios.get(
         "https://swiss-project-api.onrender.com/api/v1/cards",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setCartoes(resposta.data);
     } catch (erro) {
@@ -557,32 +611,36 @@ export function Dashboard() {
     if (!window.confirm("Tem certeza que deseja excluir este cartão?")) return;
     const token = localStorage.getItem("token");
     try {
+      setIsLoading(true);
       await axios.delete(
         `https://swiss-project-api.onrender.com/api/v1/cards/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      buscarCartoes();
+      await buscarCartoes();
+      showToast("Cartão excluído com sucesso!", "success");
     } catch (erro) {
-      console.error("Erro ao excluir cartão:", erro);
-      alert("Erro ao excluir o cartão.");
+      console.error(erro);
+      showToast("Erro ao excluir o cartão.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleAddCartao = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!novoCartaoNome || !novoCartaoFinal || !novoCartaoLimite) return;
-
     const limiteNumerico = parseFloat(
       novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", "."),
     );
-    if (isNaN(limiteNumerico)) return alert(t.errorValue);
-
+    if (isNaN(limiteNumerico)) {
+      showToast(t.errorValue, "error");
+      return;
+    }
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
+      setIsLoading(true);
       await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/cards",
         {
@@ -591,27 +649,23 @@ export function Dashboard() {
           totalLimit: limiteNumerico,
           color: novoCartaoCor,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-
       setIsCardModalOpen(false);
       setNovoCartaoNome("");
       setNovoCartaoFinal("");
       setNovoCartaoLimite("");
       setNovoCartaoCor("#8A05BE");
-
-      buscarCartoes();
+      await buscarCartoes();
+      showToast("Cartão adicionado com sucesso!", "success");
     } catch (erro) {
       console.error("Erro ao criar cartão:", erro);
-      alert("Erro ao salvar o cartão. Verifique os dados.");
+      showToast("Erro ao salvar o cartão. Verifique os dados.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ==========================================
-  // HELPERS DE FORMATAÇÃO E COMPONENTES MENORES
-  // ==========================================
   const getCategoriasDisponiveis = () => {
     const catKeys =
       tipoTransacaoSelecionado === "INCOME"
@@ -696,10 +750,11 @@ export function Dashboard() {
       }}
     >
       <img
-        src={logoImg}
+        src="/logo.png"
         alt="Logo"
         style={{
           height: "100%",
+
           width: "100%",
           objectFit: "cover",
           transform: "scale(1.3)",
@@ -726,16 +781,19 @@ export function Dashboard() {
         }}
         style={{
           padding: "1.2rem 1.5rem",
-          borderBottom: "1px solid #f0f0f0",
+          borderBottom: `1px solid ${theme.border}`,
           cursor: "pointer",
           fontWeight: isAtivo ? "bold" : "normal",
-          color: isAtivo ? "#EC0000" : "#666",
-          borderLeft: isAtivo ? "4px solid #EC0000" : "4px solid transparent",
-          backgroundColor: isAtivo ? "#fff9f9" : "transparent",
+          color: isAtivo ? (isDarkMode ? "#f5f5f5" : theme.red) : theme.textSec,
+          borderLeft: isAtivo
+            ? `4px solid ${theme.red}`
+            : "4px solid transparent",
+          backgroundColor: isAtivo ? theme.highlightBg : "transparent",
           transition: "all 0.2s ease-in-out",
         }}
         onMouseEnter={(e) => {
-          if (!isAtivo) e.currentTarget.style.backgroundColor = "#fafafa";
+          if (!isAtivo)
+            e.currentTarget.style.backgroundColor = theme.sidebarHover;
         }}
         onMouseLeave={(e) => {
           if (!isAtivo) e.currentTarget.style.backgroundColor = "transparent";
@@ -751,7 +809,6 @@ export function Dashboard() {
   );
   const catSelecionadaData =
     categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
-
   const cartaoSelecionado = cartoes.find(
     (c) => String(c.id) === cartaoSelecionadoId,
   );
@@ -763,11 +820,84 @@ export function Dashboard() {
     <div
       style={{
         fontFamily: "sans-serif",
-        backgroundColor: "#f9fafb",
+        backgroundColor: theme.bgMain,
         minHeight: "100vh",
         paddingBottom: "2rem",
+        transition: "background-color 0.3s ease",
       }}
     >
+      {/* CÓDIGO DO TOAST (NOTIFICAÇÃO) */}
+      <style>{`
+        @keyframes slideUpToast { from { bottom: -50px; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      `}</style>
+
+      {toast.show && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: toast.type === "error" ? theme.red : theme.green,
+            color: "white",
+            padding: "12px 24px",
+            borderRadius: "30px",
+            boxShadow: "0 8px 16px rgba(0,0,0,0.3)",
+            zIndex: 10000,
+            fontWeight: "600",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            animation: "slideUpToast 0.3s ease-out",
+          }}
+        >
+          {toast.type === "error" ? "⚠️" : "✅"} {toast.message}
+        </div>
+      )}
+
+      {/* CÓDIGO DO LOADING GERAL (OVERLAY) */}
+      {isLoading && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: isDarkMode
+              ? "rgba(0,0,0,0.8)"
+              : "rgba(255,255,255,0.8)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              width: "50px",
+              height: "50px",
+              borderRadius: "50%",
+              border: `5px solid ${theme.border}`,
+              borderTop: `5px solid ${theme.red}`,
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p
+            style={{
+              marginTop: "15px",
+              color: theme.textMain,
+              fontWeight: "600",
+              fontSize: "1.1rem",
+            }}
+          >
+            Carregando...
+          </p>
+        </div>
+      )}
+
       {/* OVERLAY DO MENU MOBILE */}
       {menuAberto && (
         <div
@@ -778,7 +908,7 @@ export function Dashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(0,0,0,0.6)",
             zIndex: 999,
           }}
         />
@@ -792,8 +922,8 @@ export function Dashboard() {
           left: menuAberto ? 0 : "-308px",
           width: "308px",
           height: "100vh",
-          backgroundColor: "#fff",
-          boxShadow: "2px 0 10px rgba(0,0,0,0.1)",
+          backgroundColor: theme.sidebarBg,
+          boxShadow: theme.shadow,
           transition: "left 0.3s ease-in-out",
           zIndex: 1000,
           display: "flex",
@@ -802,7 +932,7 @@ export function Dashboard() {
       >
         <div
           style={{
-            backgroundColor: "#EC0000",
+            backgroundColor: "#d91616",
             padding: "1.5rem 1.5rem",
             color: "white",
           }}
@@ -842,18 +972,18 @@ export function Dashboard() {
         </ul>
       </div>
 
-      {/* HEADER (CABEÇALHO) */}
+      {/* HEADER (CABEÇALHO) LIMPO E ADAPTADO */}
       <header
         style={{
-          backgroundColor: "#EC0000",
+          backgroundColor: "#d91616",
           color: "white",
-          padding: "0 1.5rem",
+          padding: isMobile ? "0 1rem" : "0 1.5rem",
           height: "80px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           borderRadius: "0 0 22px 22px",
-          boxShadow: "0 8px 20px rgba(100, 98, 98, 0.35)",
+          boxShadow: theme.shadow,
           marginBottom: "2rem",
           position: "relative",
           zIndex: 10,
@@ -863,7 +993,7 @@ export function Dashboard() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "30px",
+            gap: isMobile ? "10px" : "30px",
             height: "100%",
           }}
         >
@@ -879,6 +1009,8 @@ export function Dashboard() {
               alignItems: "center",
               justifyContent: "center",
               padding: 0,
+              lineHeight: 1,
+              marginTop: "-3px",
             }}
           >
             ☰
@@ -888,16 +1020,16 @@ export function Dashboard() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "18px",
+              gap: isMobile ? "8px" : "18px",
               cursor: "pointer",
               height: "100%",
             }}
           >
-            <AppLogo size={40} />
+            <AppLogo size={isMobile ? 30 : 40} />
             <h2
               style={{
                 margin: 0,
-                fontSize: "1.6rem",
+                fontSize: isMobile ? "1.1rem" : "1.6rem",
                 fontWeight: "700",
                 letterSpacing: "0.5px",
               }}
@@ -907,104 +1039,46 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <div ref={menuIdiomaRef} style={{ position: "relative" }}>
-            <button
-              onClick={() => setMenuIdiomaAberto(!menuIdiomaAberto)}
-              style={{
-                background: "rgba(255,255,255,0.15)",
-                border: "none",
-                borderRadius: "22px",
-                padding: "10px 13px",
-                fontSize: "1.1rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "7px",
-                color: "white",
-              }}
-            >
-              {t.flag}{" "}
-              <span style={{ fontSize: "0.8rem", opacity: 0.8 }}>▼</span>
-            </button>
-            {menuIdiomaAberto && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "60px",
-                  right: 0,
-                  backgroundColor: "#fff",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-                  padding: "10px",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "8px",
-                  zIndex: 1001,
-                  minWidth: "220px",
-                }}
-              >
-                {idiomasOrdenados.map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => {
-                      setIdioma(lang);
-                      setMenuIdiomaAberto(false);
-                    }}
-                    style={{
-                      background: idioma === lang ? "#f5f5f5" : "transparent",
-                      border: "none",
-                      padding: "8px 10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontSize: "0.9rem",
-                      color: "#333",
-                      textAlign: "left",
-                      fontWeight: idioma === lang ? "bold" : "normal",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem" }}>
-                      {translations[lang].flag}
-                    </span>{" "}
-                    {t.langs[lang]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <span style={{ fontSize: "1.0rem" }}>
-              {t.welcome}, <strong>{nomeUsuario}</strong>
-            </span>
-            <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                navigate("/");
-              }}
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                color: "white",
-                border: "none",
-                padding: "10px 20px",
-                borderRadius: "25px",
-                fontSize: "1.0rem",
-                cursor: "pointer",
-                fontWeight: "600",
-              }}
-            >
-              {t.logout}
-            </button>
-          </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: isMobile ? "8px" : "15px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: isMobile ? "0.85rem" : "1.0rem",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t.welcome}, <strong>{primeiroNome}</strong>
+          </span>
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              navigate("/");
+            }}
+            style={{
+              background: "rgba(255,255,255,0.1)",
+              color: "white",
+              border: "none",
+              padding: isMobile ? "6px 12px" : "10px 20px",
+              borderRadius: "25px",
+              fontSize: isMobile ? "0.85rem" : "1.0rem",
+              cursor: "pointer",
+              fontWeight: "600",
+            }}
+          >
+            {t.logout}
+          </button>
         </div>
       </header>
 
       {/* ÁREA DE CONTEÚDO */}
       <div
         style={{
-          padding: "0 2rem 2rem 2rem",
+          padding: isMobile ? "0 1rem 1rem 1rem" : "0 2rem 2rem 2rem",
           maxWidth: "750px",
           margin: "0 auto",
         }}
@@ -1015,25 +1089,29 @@ export function Dashboard() {
             {/* Card Saldo Principal */}
             <div
               style={{
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 padding: "2rem",
                 borderRadius: "16px",
                 textAlign: "center",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                boxShadow: theme.shadow,
                 position: "relative",
+                transition: "background-color 0.3s ease",
               }}
             >
               {cotacoes.usd > 0 && (
                 <div
                   style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
+                    position: isMobile ? "relative" : "absolute",
+                    top: isMobile ? "0" : "20px",
+                    right: isMobile ? "0" : "20px",
+                    margin: isMobile ? "0 auto 1.5rem auto" : "0",
+                    width: "fit-content",
                     display: "flex",
                     gap: "5px",
-                    backgroundColor: "#f5f5f5",
+                    backgroundColor: theme.inputBg,
                     padding: "4px",
                     borderRadius: "8px",
+                    border: `1px solid ${theme.border}`,
                   }}
                 >
                   {(["BRL", "USD", "EUR"] as const).map((moeda) => (
@@ -1042,14 +1120,16 @@ export function Dashboard() {
                       onClick={() => setMoedaExibicao(moeda)}
                       style={{
                         background:
-                          moedaExibicao === moeda ? "#fff" : "transparent",
+                          moedaExibicao === moeda
+                            ? theme.highlightBg
+                            : "transparent",
                         border: "none",
                         padding: "4px 10px",
                         borderRadius: "6px",
                         cursor: "pointer",
                         fontSize: "0.8rem",
                         fontWeight: moedaExibicao === moeda ? "bold" : "normal",
-                        color: "#333",
+                        color: theme.textMain,
                         boxShadow:
                           moedaExibicao === moeda
                             ? "0 1px 3px rgba(0,0,0,0.1)"
@@ -1063,7 +1143,7 @@ export function Dashboard() {
               )}
               <p
                 style={{
-                  color: "#888",
+                  color: theme.textMuted,
                   margin: 0,
                   fontSize: "0.8rem",
                   textTransform: "uppercase",
@@ -1076,7 +1156,7 @@ export function Dashboard() {
                 style={{
                   fontSize: "2.5rem",
                   margin: "10px 0",
-                  color: "#111",
+                  color: theme.textMain,
                   fontWeight: "600",
                 }}
               >
@@ -1085,7 +1165,7 @@ export function Dashboard() {
                     <span
                       style={{
                         fontSize: "1.2rem",
-                        color: "#888",
+                        color: theme.textMuted,
                         fontWeight: "normal",
                         marginRight: "5px",
                       }}
@@ -1106,7 +1186,7 @@ export function Dashboard() {
                     gap: "25px",
                     marginTop: "15px",
                     paddingTop: "15px",
-                    borderTop: "1px solid #f0f0f0",
+                    borderTop: `1px solid ${theme.border}`,
                   }}
                 >
                   {moedaExibicao !== "BRL" && (
@@ -1115,7 +1195,7 @@ export function Dashboard() {
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        color: "#555",
+                        color: theme.textSec,
                         fontSize: "0.95rem",
                       }}
                     >
@@ -1129,7 +1209,7 @@ export function Dashboard() {
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        color: "#555",
+                        color: theme.textSec,
                         fontSize: "0.95rem",
                       }}
                       title={`Cotação: R$ ${cotacoes.usd.toFixed(2)}`}
@@ -1144,7 +1224,7 @@ export function Dashboard() {
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        color: "#555",
+                        color: theme.textSec,
                         fontSize: "0.95rem",
                       }}
                       title={`Cotação: R$ ${cotacoes.eur.toFixed(2)}`}
@@ -1161,15 +1241,16 @@ export function Dashboard() {
               style={{
                 marginTop: "1.5rem",
                 padding: "2rem",
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 borderRadius: "20px",
-                boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
+                boxShadow: theme.shadow,
+                transition: "background-color 0.3s ease",
               }}
             >
               <h4
                 style={{
                   margin: "0 0 20px 0",
-                  color: "#333",
+                  color: theme.textMain,
                   fontSize: "1.1rem",
                   fontWeight: "600",
                 }}
@@ -1187,14 +1268,13 @@ export function Dashboard() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    backgroundColor: "#f9fafb",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                    backgroundColor: theme.inputBg,
                     borderRadius: "30px",
                     padding: "4px",
-                    border: "1px solid #eaeaea",
-                    width: "fit-content",
+                    border: `1px solid ${theme.border}`,
+                    width: isMobile ? "100%" : "fit-content",
                     margin: "0 auto",
-                    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
                   }}
                 >
                   {(["EXPENSE", "INCOME"] as const).map((type) => {
@@ -1208,8 +1288,12 @@ export function Dashboard() {
                         style={{
                           background: isSelected
                             ? isExpense
-                              ? "#ffebee"
-                              : "#e8f5e9"
+                              ? isDarkMode
+                                ? "#4a1c1c"
+                                : "#ffebee"
+                              : isDarkMode
+                                ? "#1b3320"
+                                : "#e8f5e9"
                             : "transparent",
                           border: "none",
                           padding: "8px 25px",
@@ -1219,11 +1303,11 @@ export function Dashboard() {
                           fontWeight: "600",
                           color: isSelected
                             ? isExpense
-                              ? "#EC0000"
-                              : "#2e7d32"
-                            : "#888",
+                              ? theme.red
+                              : theme.green
+                            : theme.textMuted,
                           boxShadow: isSelected
-                            ? "0 2px 5px rgba(0,0,0,0.1)"
+                            ? "0 2px 5px rgba(0,0,0,0.2)"
                             : "none",
                           transition: "all 0.2s",
                         }}
@@ -1237,7 +1321,7 @@ export function Dashboard() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
                     gap: "15px",
                   }}
                 >
@@ -1246,7 +1330,7 @@ export function Dashboard() {
                       style={{
                         margin: "0 0 6px 0",
                         fontSize: "0.75rem",
-                        color: "#888",
+                        color: theme.textMuted,
                         fontWeight: "600",
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
@@ -1264,18 +1348,11 @@ export function Dashboard() {
                         justifyContent: "space-between",
                         padding: "10px 14px",
                         borderRadius: "10px",
-                        border: "1px solid #eaeaea",
-                        backgroundColor: "#fafafa",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
                         cursor: "pointer",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
                         transition: "border-color 0.2s",
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.borderColor = "#ccc")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.borderColor = "#eaeaea")
-                      }
                     >
                       <div
                         style={{
@@ -1290,7 +1367,7 @@ export function Dashboard() {
                         <span
                           style={{
                             fontSize: "0.9rem",
-                            color: "#333",
+                            color: theme.textMain,
                             fontWeight: "500",
                           }}
                         >
@@ -1300,7 +1377,7 @@ export function Dashboard() {
                       <span
                         style={{
                           fontSize: "0.7rem",
-                          color: "#aaa",
+                          color: theme.textMuted,
                           transform: menuCategoriaAberto
                             ? "rotate(180deg)"
                             : "none",
@@ -1317,12 +1394,12 @@ export function Dashboard() {
                           top: "calc(100% + 5px)",
                           left: 0,
                           width: "100%",
-                          backgroundColor: "#fff",
+                          backgroundColor: theme.bgCard,
                           borderRadius: "12px",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                          boxShadow: theme.shadow,
                           padding: "6px",
                           zIndex: 1002,
-                          border: "1px solid #f0f0f0",
+                          border: `1px solid ${theme.border}`,
                         }}
                       >
                         {getCategoriasDisponiveis().map((catKey) => (
@@ -1330,6 +1407,8 @@ export function Dashboard() {
                             key={catKey}
                             catKey={catKey}
                             idiom={idioma}
+                            theme={theme}
+                            isSelected={categoriaSelecionada === catKey}
                             onSelect={() => {
                               setCategoriaSelecionada(catKey);
                               setMenuCategoriaAberto(false);
@@ -1346,7 +1425,7 @@ export function Dashboard() {
                         style={{
                           margin: "0 0 6px 0",
                           fontSize: "0.75rem",
-                          color: "#888",
+                          color: theme.textMuted,
                           fontWeight: "600",
                           textTransform: "uppercase",
                           letterSpacing: "0.5px",
@@ -1364,19 +1443,10 @@ export function Dashboard() {
                           justifyContent: "space-between",
                           padding: "10px 14px",
                           borderRadius: "10px",
-                          border: "1px solid #eaeaea",
-                          backgroundColor: "#fafafa",
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: theme.inputBg,
                           cursor: "pointer",
-                          opacity: 1,
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
-                          transition:
-                            "border-color 0.2s, background-color 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "#ccc";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "#eaeaea";
+                          transition: "border-color 0.2s",
                         }}
                       >
                         <div
@@ -1402,7 +1472,7 @@ export function Dashboard() {
                               <span
                                 style={{
                                   fontSize: "0.9rem",
-                                  color: "#333",
+                                  color: theme.textMain,
                                   fontWeight: "500",
                                 }}
                               >
@@ -1417,7 +1487,7 @@ export function Dashboard() {
                               <span
                                 style={{
                                   fontSize: "0.9rem",
-                                  color: "#333",
+                                  color: theme.textMain,
                                   fontWeight: "500",
                                 }}
                               >
@@ -1429,7 +1499,7 @@ export function Dashboard() {
                         <span
                           style={{
                             fontSize: "0.7rem",
-                            color: "#aaa",
+                            color: theme.textMuted,
                             transform: menuCartaoAberto
                               ? "rotate(180deg)"
                               : "none",
@@ -1446,28 +1516,29 @@ export function Dashboard() {
                             top: "calc(100% + 5px)",
                             left: 0,
                             width: "100%",
-                            backgroundColor: "#fff",
+                            backgroundColor: theme.bgCard,
                             borderRadius: "12px",
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                            boxShadow: theme.shadow,
                             padding: "6px",
                             zIndex: 1002,
-                            border: "1px solid #f0f0f0",
+                            border: `1px solid ${theme.border}`,
                           }}
                         >
                           <PaymentMethodOption
                             t={t}
+                            theme={theme}
                             onSelect={() => {
                               setCartaoSelecionadoId("");
                               setMenuCartaoAberto(false);
                             }}
                             isSelected={cartaoSelecionadoId === ""}
                           />
-
                           {cartoes.map((c) => (
                             <PaymentMethodOption
                               key={c.id}
                               card={c}
                               t={t}
+                              theme={theme}
                               onSelect={() => {
                                 setCartaoSelecionadoId(String(c.id));
                                 setMenuCartaoAberto(false);
@@ -1479,14 +1550,14 @@ export function Dashboard() {
                       )}
                     </div>
                   ) : (
-                    <div></div>
+                    <div style={{ display: isMobile ? "none" : "block" }}></div>
                   )}
                 </div>
 
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "2fr 1fr",
+                    gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
                     gap: "15px",
                     alignItems: "flex-end",
                   }}
@@ -1496,7 +1567,7 @@ export function Dashboard() {
                       style={{
                         margin: "0 0 6px 0",
                         fontSize: "0.75rem",
-                        color: "#888",
+                        color: theme.textMuted,
                         fontWeight: "600",
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
@@ -1506,7 +1577,6 @@ export function Dashboard() {
                     </p>
                     <input
                       type="text"
-                      placeholder={t.descPlaceholder}
                       required
                       value={novaDescricao}
                       onChange={handleDescricaoChange}
@@ -1514,20 +1584,14 @@ export function Dashboard() {
                         width: "100%",
                         padding: "10px 14px",
                         borderRadius: "10px",
-                        border: "1px solid #eaeaea",
-                        backgroundColor: "#fafafa",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textMain,
                         outline: "none",
                         fontSize: "0.9rem",
                         boxSizing: "border-box",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
                         transition: "border-color 0.2s",
                       }}
-                      onFocus={(e) =>
-                        (e.currentTarget.style.borderColor = "#EC0000")
-                      }
-                      onBlur={(e) =>
-                        (e.currentTarget.style.borderColor = "#eaeaea")
-                      }
                     />
                   </div>
                   <div>
@@ -1535,18 +1599,17 @@ export function Dashboard() {
                       style={{
                         margin: "0 0 6px 0",
                         fontSize: "0.75rem",
-                        color: "#888",
+                        color: theme.textMuted,
                         fontWeight: "600",
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
-                        textAlign: "right",
+                        textAlign: isMobile ? "left" : "right",
                       }}
                     >
                       {t.valueLabel || "Valor"}
                     </p>
                     <input
                       type="text"
-                      placeholder={t.valPlaceholder}
                       required
                       value={novoValor}
                       onChange={handleValorChange}
@@ -1554,22 +1617,16 @@ export function Dashboard() {
                         width: "100%",
                         padding: "10px 14px",
                         borderRadius: "10px",
-                        border: "1px solid #eaeaea",
-                        backgroundColor: "#fafafa",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textMain,
                         outline: "none",
-                        textAlign: "right",
+                        textAlign: isMobile ? "left" : "right",
                         fontSize: "0.9rem",
                         boxSizing: "border-box",
                         fontWeight: "600",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
                         transition: "border-color 0.2s",
                       }}
-                      onFocus={(e) =>
-                        (e.currentTarget.style.borderColor = "#EC0000")
-                      }
-                      onBlur={(e) =>
-                        (e.currentTarget.style.borderColor = "#eaeaea")
-                      }
                     />
                   </div>
                 </div>
@@ -1578,30 +1635,17 @@ export function Dashboard() {
                   type="submit"
                   style={{
                     padding: "12px 20px",
-                    backgroundColor: "#EC0000",
+                    backgroundColor: "#d91616",
                     color: "white",
                     border: "none",
                     borderRadius: "12px",
                     fontWeight: "bold",
                     cursor: "pointer",
                     fontSize: "0.95rem",
-                    boxShadow: "0 4px 12px rgba(236,0,0,0.2)",
-                    transition: "background-color 0.2s, transform 0.1s",
-                    alignSelf: "center",
-                    minWidth: "150px",
+                    alignSelf: isMobile ? "stretch" : "center",
+                    minWidth: isMobile ? "auto" : "150px",
+                    boxShadow: "0 4px 12px rgba(217, 22, 22, 0.2)",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#D50000")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#EC0000")
-                  }
-                  onMouseDown={(e) =>
-                    (e.currentTarget.style.transform = "scale(0.98)")
-                  }
-                  onMouseUp={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
-                  }
                 >
                   {t.btnRegister}
                 </button>
@@ -1612,16 +1656,17 @@ export function Dashboard() {
             <div
               style={{
                 marginTop: "1.5rem",
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 padding: "1.5rem",
                 borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                boxShadow: theme.shadow,
+                transition: "background-color 0.3s ease",
               }}
             >
               <h3
                 style={{
                   margin: "0 0 15px 0",
-                  color: "#333",
+                  color: theme.textMain,
                   fontSize: "1.1rem",
                   fontWeight: "600",
                 }}
@@ -1642,14 +1687,18 @@ export function Dashboard() {
                       !t_row.category || t_row.category === "OTHER";
                     const corDeFundoIcone = isOutros
                       ? isExpense
-                        ? "#ffebee"
-                        : "#e8f5e9"
+                        ? isDarkMode
+                          ? "#4a1c1c"
+                          : "#ffebee"
+                        : isDarkMode
+                          ? "#1b3320"
+                          : "#e8f5e9"
                       : categoriaVisual.bgColor;
 
                     return (
                       <tr
                         key={t_row.id || i}
-                        style={{ borderBottom: "1px solid #f5f5f5" }}
+                        style={{ borderBottom: `1px solid ${theme.border}` }}
                       >
                         <td
                           style={{
@@ -1678,7 +1727,7 @@ export function Dashboard() {
                             <div
                               style={{
                                 fontWeight: "500",
-                                color: "#333",
+                                color: theme.textMain,
                                 fontSize: "0.95rem",
                               }}
                             >
@@ -1686,14 +1735,14 @@ export function Dashboard() {
                             </div>
                             <div
                               style={{
-                                color: "#aaa",
+                                color: theme.textMuted,
                                 fontSize: "0.75rem",
                                 marginTop: "4px",
                               }}
                             >
                               <span
                                 style={{
-                                  color: isExpense ? "#EC0000" : "#107c10",
+                                  color: isExpense ? theme.red : theme.green,
                                   fontWeight: "bold",
                                   marginRight: "6px",
                                 }}
@@ -1708,7 +1757,7 @@ export function Dashboard() {
                                     color:
                                       t_row.card.color ||
                                       t_row.card.cor ||
-                                      "#888",
+                                      theme.textMuted,
                                     fontWeight: "600",
                                   }}
                                 >
@@ -1722,12 +1771,12 @@ export function Dashboard() {
                           <div
                             style={{
                               fontWeight: "600",
-                              color: isExpense ? "#EC0000" : "#107c10",
+                              color: isExpense ? theme.red : theme.green,
                               fontSize: "0.95rem",
                             }}
                           >
-                            {isExpense ? "- " : "+ "}
-                            {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                            {isExpense ? "- " : "+ "} {infoExibicao.simbolo}{" "}
+                            {infoExibicao.valorFormatado}
                           </div>
                         </td>
                         <td style={{ width: "40px", textAlign: "right" }}>
@@ -1736,7 +1785,7 @@ export function Dashboard() {
                             style={{
                               background: "none",
                               border: "none",
-                              color: "#ccc",
+                              color: theme.textMuted,
                               cursor: "pointer",
                               fontSize: "1.2rem",
                             }}
@@ -1753,7 +1802,7 @@ export function Dashboard() {
                 <p
                   style={{
                     textAlign: "center",
-                    color: "#999",
+                    color: theme.textMuted,
                     fontSize: "0.9rem",
                     marginTop: "20px",
                   }}
@@ -1772,27 +1821,31 @@ export function Dashboard() {
           >
             <div
               style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem 2rem",
+                backgroundColor: theme.bgCard,
+                padding: isMobile ? "1.2rem 1rem" : "1.5rem 2rem",
                 borderRadius: "16px",
                 display: "flex",
+                flexDirection: isMobile ? "column" : "row",
                 justifyContent: "space-between",
-                alignItems: "center",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                alignItems: isMobile ? "flex-start" : "center",
+                gap: isMobile ? "15px" : "0",
+                boxShadow: theme.shadow,
+                transition: "background-color 0.3s ease",
               }}
             >
-              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 📊 {t.statement}
               </h2>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  backgroundColor: "#f9fafb",
+                  backgroundColor: theme.inputBg,
                   borderRadius: "12px",
                   padding: "4px",
-                  border: "1px solid #eaeaea",
-                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
+                  border: `1px solid ${theme.border}`,
                 }}
               >
                 <button
@@ -1803,19 +1856,12 @@ export function Dashboard() {
                     cursor: "pointer",
                     padding: "8px 12px",
                     fontSize: "1.1rem",
-                    color: "#555",
+                    color: theme.textSec,
                     borderRadius: "8px",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#eee")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
                 >
                   ❮
                 </button>
-
                 <div ref={monthPickerRef} style={{ position: "relative" }}>
                   <div
                     onClick={() => {
@@ -1826,24 +1872,16 @@ export function Dashboard() {
                       minWidth: "140px",
                       textAlign: "center",
                       fontWeight: "600",
-                      color: "#333",
+                      color: theme.textMain,
                       fontSize: "1rem",
                       userSelect: "none",
                       cursor: "pointer",
                       padding: "4px 8px",
                       borderRadius: "8px",
-                      transition: "background-color 0.2s",
                     }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.backgroundColor = "#eee")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.backgroundColor = "transparent")
-                    }
                   >
                     {t.months[mesFiltro - 1]} {anoFiltro}
                   </div>
-
                   {isMonthPickerOpen && (
                     <div
                       style={{
@@ -1851,13 +1889,13 @@ export function Dashboard() {
                         top: "100%",
                         left: "50%",
                         transform: "translateX(-50%)",
-                        backgroundColor: "#fff",
+                        backgroundColor: theme.bgCard,
                         borderRadius: "16px",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                        boxShadow: theme.shadow,
                         padding: "16px",
                         zIndex: 1005,
                         width: "240px",
-                        border: "1px solid #f0f0f0",
+                        border: `1px solid ${theme.border}`,
                         marginTop: "8px",
                       }}
                     >
@@ -1877,7 +1915,7 @@ export function Dashboard() {
                             border: "none",
                             cursor: "pointer",
                             fontSize: "1.1rem",
-                            color: "#555",
+                            color: theme.textSec,
                           }}
                         >
                           ❮
@@ -1886,7 +1924,7 @@ export function Dashboard() {
                           style={{
                             fontWeight: "bold",
                             fontSize: "1.1rem",
-                            color: "#111",
+                            color: theme.textMain,
                           }}
                         >
                           {pickerYear}
@@ -1898,7 +1936,7 @@ export function Dashboard() {
                             border: "none",
                             cursor: "pointer",
                             fontSize: "1.1rem",
-                            color: "#555",
+                            color: theme.textSec,
                           }}
                         >
                           ❯
@@ -1927,23 +1965,12 @@ export function Dashboard() {
                                 border: "none",
                                 borderRadius: "10px",
                                 backgroundColor: isSelected
-                                  ? "#EC0000"
-                                  : "#f9fafb",
-                                color: isSelected ? "#fff" : "#555",
+                                  ? "#d91616"
+                                  : theme.inputBg,
+                                color: isSelected ? "#fff" : theme.textSec,
                                 fontWeight: isSelected ? "bold" : "500",
                                 cursor: "pointer",
                                 fontSize: "0.85rem",
-                                transition: "background-color 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected)
-                                  e.currentTarget.style.backgroundColor =
-                                    "#eee";
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected)
-                                  e.currentTarget.style.backgroundColor =
-                                    "#f9fafb";
                               }}
                             >
                               {monthName.slice(0, 3)}
@@ -1954,7 +1981,6 @@ export function Dashboard() {
                     </div>
                   )}
                 </div>
-
                 <button
                   onClick={handleMesSeguinte}
                   style={{
@@ -1963,15 +1989,9 @@ export function Dashboard() {
                     cursor: "pointer",
                     padding: "8px 12px",
                     fontSize: "1.1rem",
-                    color: "#555",
+                    color: theme.textSec,
                     borderRadius: "8px",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#eee")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
                 >
                   ❯
                 </button>
@@ -1987,17 +2007,18 @@ export function Dashboard() {
             >
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "1.5rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: "4px solid #107c10",
+                  boxShadow: theme.shadow,
+                  borderBottom: `4px solid ${theme.green}`,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <p
                   style={{
                     margin: 0,
-                    color: "#888",
+                    color: theme.textMuted,
                     fontSize: "0.85rem",
                     textTransform: "uppercase",
                     letterSpacing: "1px",
@@ -2008,14 +2029,14 @@ export function Dashboard() {
                 <h3
                   style={{
                     margin: "10px 0 0 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.5rem",
                   }}
                 >
                   <span
                     style={{
                       fontSize: "1rem",
-                      color: "#107c10",
+                      color: theme.green,
                       marginRight: "4px",
                     }}
                   >
@@ -2026,17 +2047,18 @@ export function Dashboard() {
               </div>
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "1.5rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: "4px solid #EC0000",
+                  boxShadow: theme.shadow,
+                  borderBottom: `4px solid ${theme.red}`,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <p
                   style={{
                     margin: 0,
-                    color: "#888",
+                    color: theme.textMuted,
                     fontSize: "0.85rem",
                     textTransform: "uppercase",
                     letterSpacing: "1px",
@@ -2047,14 +2069,14 @@ export function Dashboard() {
                 <h3
                   style={{
                     margin: "10px 0 0 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.5rem",
                   }}
                 >
                   <span
                     style={{
                       fontSize: "1rem",
-                      color: "#EC0000",
+                      color: theme.red,
                       marginRight: "4px",
                     }}
                   >
@@ -2065,17 +2087,18 @@ export function Dashboard() {
               </div>
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "1.5rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  borderBottom: `4px solid ${saldoMes >= 0 ? "#107c10" : "#EC0000"}`,
+                  boxShadow: theme.shadow,
+                  borderBottom: `4px solid ${saldoMes >= 0 ? theme.green : theme.red}`,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <p
                   style={{
                     margin: 0,
-                    color: "#888",
+                    color: theme.textMuted,
                     fontSize: "0.85rem",
                     textTransform: "uppercase",
                     letterSpacing: "1px",
@@ -2086,14 +2109,14 @@ export function Dashboard() {
                 <h3
                   style={{
                     margin: "10px 0 0 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.5rem",
                   }}
                 >
                   <span
                     style={{
                       fontSize: "1rem",
-                      color: saldoMes >= 0 ? "#107c10" : "#EC0000",
+                      color: saldoMes >= 0 ? theme.green : theme.red,
                       marginRight: "4px",
                     }}
                   >
@@ -2106,23 +2129,23 @@ export function Dashboard() {
 
             <div
               style={{
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 padding: "1.5rem",
                 borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                boxShadow: theme.shadow,
+                transition: "background-color 0.3s ease",
               }}
             >
               <h3
                 style={{
                   margin: "0 0 15px 0",
-                  color: "#333",
+                  color: theme.textMain,
                   fontSize: "1.1rem",
                   fontWeight: "600",
                 }}
               >
                 {t.periodTransactions}
               </h3>
-
               {Object.entries(transacoesAgrupadas).map(([key, grupo]) => (
                 <div key={key} style={{ marginBottom: "2.5rem" }}>
                   <h4
@@ -2153,14 +2176,20 @@ export function Dashboard() {
                           !t_row.category || t_row.category === "OTHER";
                         const corDeFundoIcone = isOutros
                           ? isExpense
-                            ? "#ffebee"
-                            : "#e8f5e9"
+                            ? isDarkMode
+                              ? "#4a1c1c"
+                              : "#ffebee"
+                            : isDarkMode
+                              ? "#1b3320"
+                              : "#e8f5e9"
                           : categoriaVisual.bgColor;
 
                         return (
                           <tr
                             key={t_row.id || i}
-                            style={{ borderBottom: "1px solid #f5f5f5" }}
+                            style={{
+                              borderBottom: `1px solid ${theme.border}`,
+                            }}
                           >
                             <td
                               style={{
@@ -2189,7 +2218,7 @@ export function Dashboard() {
                                 <div
                                   style={{
                                     fontWeight: "500",
-                                    color: "#333",
+                                    color: theme.textMain,
                                     fontSize: "0.95rem",
                                   }}
                                 >
@@ -2197,14 +2226,16 @@ export function Dashboard() {
                                 </div>
                                 <div
                                   style={{
-                                    color: "#aaa",
+                                    color: theme.textMuted,
                                     fontSize: "0.75rem",
                                     marginTop: "4px",
                                   }}
                                 >
                                   <span
                                     style={{
-                                      color: isExpense ? "#EC0000" : "#107c10",
+                                      color: isExpense
+                                        ? theme.red
+                                        : theme.green,
                                       fontWeight: "bold",
                                       marginRight: "6px",
                                     }}
@@ -2221,7 +2252,7 @@ export function Dashboard() {
                               <div
                                 style={{
                                   fontWeight: "600",
-                                  color: isExpense ? "#EC0000" : "#107c10",
+                                  color: isExpense ? theme.red : theme.green,
                                   fontSize: "0.95rem",
                                 }}
                               >
@@ -2238,7 +2269,7 @@ export function Dashboard() {
                                 style={{
                                   background: "none",
                                   border: "none",
-                                  color: "#ccc",
+                                  color: theme.textMuted,
                                   cursor: "pointer",
                                   fontSize: "1.2rem",
                                 }}
@@ -2253,13 +2284,12 @@ export function Dashboard() {
                   </table>
                 </div>
               ))}
-
               {transacoesFiltradas.length === 0 && (
                 <div style={{ textAlign: "center", padding: "40px 0" }}>
                   <span style={{ fontSize: "2rem" }}>📭</span>
                   <p
                     style={{
-                      color: "#999",
+                      color: theme.textMuted,
                       fontSize: "0.95rem",
                       marginTop: "10px",
                     }}
@@ -2284,32 +2314,36 @@ export function Dashboard() {
           >
             <div
               style={{
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 padding: "1.5rem 2rem",
                 borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                boxShadow: theme.shadow,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 width: "100%",
                 maxWidth: "750px",
+                transition: "background-color 0.3s ease",
+                boxSizing: "border-box",
               }}
             >
-              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 💳 {t.cards}
               </h2>
               <button
                 onClick={() => setIsCardModalOpen(true)}
                 style={{
                   padding: "8px 16px",
-                  backgroundColor: "#EC0000",
+                  backgroundColor: "#d91616",
                   color: "white",
                   border: "none",
                   borderRadius: "12px",
                   fontWeight: "bold",
                   cursor: "pointer",
                   fontSize: "0.9rem",
-                  boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                  boxShadow: "0 4px 10px rgba(217,22,22,0.2)",
                 }}
               >
                 {t.newCard}
@@ -2330,7 +2364,7 @@ export function Dashboard() {
                 <p
                   style={{
                     textAlign: "center",
-                    color: "#999",
+                    color: theme.textMuted,
                     gridColumn: "1 / -1",
                     padding: "2rem",
                   }}
@@ -2346,7 +2380,7 @@ export function Dashboard() {
                     color: "white",
                     padding: "1.2rem",
                     borderRadius: "14px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
                     display: "flex",
                     flexDirection: "column",
                     gap: "15px",
@@ -2355,6 +2389,7 @@ export function Dashboard() {
                     aspectRatio: "1.58 / 1",
                     width: "280px",
                     margin: "0 auto",
+                    boxSizing: "border-box",
                   }}
                 >
                   <div
@@ -2369,7 +2404,6 @@ export function Dashboard() {
                       transform: "rotate(25deg)",
                     }}
                   />
-
                   <button
                     onClick={() => handleDeleteCartao(cartao.id)}
                     style={{
@@ -2388,14 +2422,9 @@ export function Dashboard() {
                       opacity: 0.7,
                     }}
                     title="Excluir Cartão"
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.opacity = "0.7")
-                    }
                   >
                     ×
                   </button>
-
                   <div
                     style={{
                       display: "flex",
@@ -2417,7 +2446,6 @@ export function Dashboard() {
                       💳
                     </span>
                   </div>
-
                   <div style={{ zIndex: 1, marginTop: "5px" }}>
                     <p
                       style={{
@@ -2440,7 +2468,6 @@ export function Dashboard() {
                       **** **** **** {cartao.lastDigits}
                     </p>
                   </div>
-
                   <div
                     style={{
                       display: "flex",
@@ -2515,7 +2542,7 @@ export function Dashboard() {
                             width: "12px",
                             height: "12px",
                             borderRadius: "50%",
-                            backgroundColor: "#EB001B",
+                            backgroundColor: "#d91616",
                             opacity: 0.8,
                           }}
                         ></div>
@@ -2543,19 +2570,21 @@ export function Dashboard() {
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            {/* CABEÇALHO DA ABA */}
             <div
               style={{
-                backgroundColor: "#fff",
+                backgroundColor: theme.bgCard,
                 padding: "1.5rem 2rem",
                 borderRadius: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                boxShadow: theme.shadow,
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
+                transition: "background-color 0.3s ease",
               }}
             >
-              <h2 style={{ color: "#333", margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 ⚙️ {t.settings}
               </h2>
             </div>
@@ -2570,85 +2599,217 @@ export function Dashboard() {
               {/* CARTÃO 1: PERFIL */}
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "2rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  boxShadow: theme.shadow,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <h3
                   style={{
                     margin: "0 0 20px 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.1rem",
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
                   }}
                 >
-                  👤 Meu Perfil
+                  👤 {t.profileTitle || "Meu Perfil"}
                 </h3>
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      color: "#888",
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    Nome de Usuário
-                  </label>
-                  <input
-                    type="text"
-                    value={nomeUsuario}
-                    disabled
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      borderRadius: "10px",
-                      border: "1px solid #eaeaea",
-                      backgroundColor: "#f5f5f5",
-                      color: "#666",
-                      fontSize: "0.95rem",
-                      boxSizing: "border-box",
-                      cursor: "not-allowed",
-                    }}
-                  />
-                  <p
-                    style={{
-                      margin: "8px 0 0 0",
-                      fontSize: "0.8rem",
-                      color: "#aaa",
-                    }}
-                  >
-                    O nome de usuário não pode ser alterado no momento.
-                  </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                    gap: "1.5rem",
+                  }}
+                >
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.8rem",
+                        color: theme.textMuted,
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {t.fullNameLabel || "Nome Completo"}
+                    </label>
+                    <input
+                      type="text"
+                      value={perfilUsuario.fullName || nomeUsuario}
+                      disabled
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        borderRadius: "10px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textSec,
+                        fontSize: "0.95rem",
+                        boxSizing: "border-box",
+                        cursor: "not-allowed",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.8rem",
+                        color: theme.textMuted,
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {t.emailLabel || "E-mail"}
+                    </label>
+                    <input
+                      type="text"
+                      value={perfilUsuario.email || "---"}
+                      disabled
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        borderRadius: "10px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textSec,
+                        fontSize: "0.95rem",
+                        boxSizing: "border-box",
+                        cursor: "not-allowed",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.8rem",
+                        color: theme.textMuted,
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {t.phoneLabel || "Telefone"}
+                    </label>
+                    <input
+                      type="text"
+                      value={perfilUsuario.phone || "---"}
+                      disabled
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        borderRadius: "10px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textSec,
+                        fontSize: "0.95rem",
+                        boxSizing: "border-box",
+                        cursor: "not-allowed",
+                      }}
+                    />
+                  </div>
                 </div>
+                <p
+                  style={{
+                    margin: "15px 0 0 0",
+                    fontSize: "0.8rem",
+                    color: theme.textMuted,
+                  }}
+                >
+                  {t.profileDesc ||
+                    "Dados pessoais vinculados ao seu cadastro. Para alterações, entre em contato com o suporte."}
+                </p>
+              </div>
+
+              {/* NOVO CARTÃO: IDIOMA */}
+              <div
+                style={{
+                  backgroundColor: theme.bgCard,
+                  padding: "2rem",
+                  borderRadius: "16px",
+                  boxShadow: theme.shadow,
+                  transition: "background-color 0.3s ease",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: "0 0 20px 0",
+                    color: theme.textMain,
+                    fontSize: "1.1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  🌐 {t.languageTitle || "Idioma"}
+                </h3>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                  {idiomasOrdenados.map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => setIdioma(lang)}
+                      style={{
+                        background:
+                          idioma === lang ? theme.highlightBg : theme.inputBg,
+                        border: `1px solid ${idioma === lang ? theme.red : theme.border}`,
+                        padding: "10px 15px",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "0.9rem",
+                        color: theme.textMain,
+                        fontWeight: idioma === lang ? "bold" : "normal",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <span style={{ fontSize: "1.2rem" }}>
+                        {translations[lang].flag}
+                      </span>{" "}
+                      {t.langs[lang]}
+                    </button>
+                  ))}
+                </div>
+                <p
+                  style={{
+                    margin: "15px 0 0 0",
+                    fontSize: "0.8rem",
+                    color: theme.textMuted,
+                  }}
+                >
+                  {t.languageDesc || "Altera o idioma de toda a aplicação."}
+                </p>
               </div>
 
               {/* CARTÃO 2: APARÊNCIA */}
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "2rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  boxShadow: theme.shadow,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <h3
                   style={{
                     margin: "0 0 20px 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.1rem",
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
                   }}
                 >
-                  🎨 Aparência
+                  🌗 {t.appearanceTitle || "Aparência"}
                 </h3>
                 <div
                   style={{
@@ -2662,17 +2823,18 @@ export function Dashboard() {
                     <strong
                       style={{
                         display: "block",
-                        color: "#333",
+                        color: theme.textMain,
                         fontSize: "0.95rem",
                       }}
                     >
-                      Modo Escuro (Dark Mode)
+                      {t.darkModeLabel || "Modo Escuro (Dark Mode)"}
                     </strong>
-                    <span style={{ fontSize: "0.8rem", color: "#888" }}>
-                      Altera o tema visual do aplicativo.
+                    <span
+                      style={{ fontSize: "0.8rem", color: theme.textMuted }}
+                    >
+                      {t.darkModeDesc || "Altera o tema visual do aplicativo."}
                     </span>
                   </div>
-                  {/* TOGGLE SWITCH CUSTOMIZADO */}
                   <div
                     onClick={() => {
                       const newMode = !isDarkMode;
@@ -2682,7 +2844,7 @@ export function Dashboard() {
                     style={{
                       width: "50px",
                       height: "26px",
-                      backgroundColor: isDarkMode ? "#107c10" : "#ccc",
+                      backgroundColor: isDarkMode ? "#d91616" : "#ccc",
                       borderRadius: "30px",
                       position: "relative",
                       cursor: "pointer",
@@ -2709,33 +2871,27 @@ export function Dashboard() {
               {/* CARTÃO 3: SEGURANÇA */}
               <div
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: theme.bgCard,
                   padding: "2rem",
                   borderRadius: "16px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  boxShadow: theme.shadow,
+                  transition: "background-color 0.3s ease",
                 }}
               >
                 <h3
                   style={{
                     margin: "0 0 20px 0",
-                    color: "#111",
+                    color: theme.textMain,
                     fontSize: "1.1rem",
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
                   }}
                 >
-                  🔒 Segurança
+                  🔒 {t.securityTitle || "Segurança"}
                 </h3>
                 <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (novaSenha !== confirmarNovaSenha)
-                      return alert("As novas senhas não coincidem!");
-                    alert(
-                      "Funcionalidade de troca de senha em desenvolvimento!",
-                    );
-                  }}
+                  onSubmit={handleMudarSenha}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -2747,24 +2903,27 @@ export function Dashboard() {
                       style={{
                         display: "block",
                         fontSize: "0.8rem",
-                        color: "#888",
+                        color: theme.textMuted,
                         fontWeight: "600",
                         textTransform: "uppercase",
                         marginBottom: "8px",
                       }}
                     >
-                      Senha Atual
+                      {t.currentPassword || "Senha Atual"}
                     </label>
                     <input
                       type="password"
                       value={senhaAtual}
                       onChange={(e) => setSenhaAtual(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder=""
+                      required
                       style={{
                         width: "100%",
                         padding: "12px 16px",
                         borderRadius: "10px",
-                        border: "1px solid #eaeaea",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        color: theme.textMain,
                         outline: "none",
                         fontSize: "0.95rem",
                         boxSizing: "border-box",
@@ -2774,7 +2933,7 @@ export function Dashboard() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
                       gap: "15px",
                     }}
                   >
@@ -2783,24 +2942,27 @@ export function Dashboard() {
                         style={{
                           display: "block",
                           fontSize: "0.8rem",
-                          color: "#888",
+                          color: theme.textMuted,
                           fontWeight: "600",
                           textTransform: "uppercase",
                           marginBottom: "8px",
                         }}
                       >
-                        Nova Senha
+                        {t.newPassword || "Nova Senha"}
                       </label>
                       <input
                         type="password"
                         value={novaSenha}
                         onChange={(e) => setNovaSenha(e.target.value)}
-                        placeholder="••••••••"
+                        placeholder=""
+                        required
                         style={{
                           width: "100%",
                           padding: "12px 16px",
                           borderRadius: "10px",
-                          border: "1px solid #eaeaea",
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: theme.inputBg,
+                          color: theme.textMain,
                           outline: "none",
                           fontSize: "0.95rem",
                           boxSizing: "border-box",
@@ -2812,24 +2974,27 @@ export function Dashboard() {
                         style={{
                           display: "block",
                           fontSize: "0.8rem",
-                          color: "#888",
+                          color: theme.textMuted,
                           fontWeight: "600",
                           textTransform: "uppercase",
                           marginBottom: "8px",
                         }}
                       >
-                        Confirmar Nova Senha
+                        {t.confirmNewPassword || "Confirmar Nova Senha"}
                       </label>
                       <input
                         type="password"
                         value={confirmarNovaSenha}
                         onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                        placeholder="••••••••"
+                        placeholder=""
+                        required
                         style={{
                           width: "100%",
                           padding: "12px 16px",
                           borderRadius: "10px",
-                          border: "1px solid #eaeaea",
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: theme.inputBg,
+                          color: theme.textMain,
                           outline: "none",
                           fontSize: "0.95rem",
                           boxSizing: "border-box",
@@ -2837,22 +3002,23 @@ export function Dashboard() {
                       />
                     </div>
                   </div>
+
                   <button
                     type="submit"
                     style={{
                       marginTop: "10px",
-                      alignSelf: "flex-end",
+                      alignSelf: isMobile ? "stretch" : "flex-end",
                       padding: "10px 24px",
-                      backgroundColor: "#EC0000",
+                      backgroundColor: "#d91616",
                       color: "white",
                       border: "none",
                       borderRadius: "10px",
                       fontWeight: "bold",
                       cursor: "pointer",
-                      boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                      boxShadow: "0 4px 10px rgba(217,22,22,0.2)",
                     }}
                   >
-                    Atualizar Senha
+                    {t.updatePassword || "Atualizar Senha"}
                   </button>
                 </form>
               </div>
@@ -2879,19 +3045,20 @@ export function Dashboard() {
         >
           <div
             style={{
-              backgroundColor: "#fff",
+              backgroundColor: theme.bgCard,
               padding: "2rem",
               borderRadius: "20px",
               width: "90%",
               maxWidth: "400px",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+              boxSizing: "border-box",
             }}
           >
             <h3
               style={{
                 marginTop: 0,
                 marginBottom: "20px",
-                color: "#333",
+                color: theme.textMain,
                 fontSize: "1.2rem",
               }}
             >
@@ -2909,9 +3076,12 @@ export function Dashboard() {
                 style={{
                   padding: "12px 14px",
                   borderRadius: "10px",
-                  border: "1px solid #ddd",
+                  border: `1px solid ${theme.border}`,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textMain,
                   fontSize: "0.95rem",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
               />
               <input
@@ -2925,9 +3095,12 @@ export function Dashboard() {
                 style={{
                   padding: "12px 14px",
                   borderRadius: "10px",
-                  border: "1px solid #ddd",
+                  border: `1px solid ${theme.border}`,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textMain,
                   fontSize: "0.95rem",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
               />
               <input
@@ -2938,9 +3111,12 @@ export function Dashboard() {
                 style={{
                   padding: "12px 14px",
                   borderRadius: "10px",
-                  border: "1px solid #ddd",
+                  border: `1px solid ${theme.border}`,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textMain,
                   fontSize: "0.95rem",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
               />
               <div>
@@ -2948,7 +3124,7 @@ export function Dashboard() {
                   style={{
                     margin: "5px 0 10px 0",
                     fontSize: "0.9rem",
-                    color: "#555",
+                    color: theme.textMuted,
                     fontWeight: "500",
                   }}
                 >
@@ -3000,7 +3176,7 @@ export function Dashboard() {
                     padding: "10px 15px",
                     border: "none",
                     background: "transparent",
-                    color: "#777",
+                    color: theme.textMuted,
                     cursor: "pointer",
                     fontWeight: "600",
                     fontSize: "0.95rem",
@@ -3013,13 +3189,13 @@ export function Dashboard() {
                   style={{
                     padding: "10px 20px",
                     border: "none",
-                    background: "#EC0000",
+                    background: "#d91616",
                     color: "white",
                     borderRadius: "10px",
                     cursor: "pointer",
                     fontWeight: "600",
                     fontSize: "0.95rem",
-                    boxShadow: "0 4px 10px rgba(236,0,0,0.2)",
+                    boxShadow: "0 4px 10px rgba(217,22,22,0.2)",
                   }}
                 >
                   {t.save}
@@ -3034,7 +3210,7 @@ export function Dashboard() {
 }
 
 // ==========================================
-// DICIONÁRIOS E MAPEAMENTOS (FINAL DO ARQUIVO)
+// DICIONÁRIOS E MAPEAMENTOS
 // ==========================================
 
 const translations = {
@@ -3063,8 +3239,6 @@ const translations = {
     newTransaction: "Registrar Nova Transação",
     income: "Entrada",
     expense: "Saída",
-    descPlaceholder: "Ex: Mercado",
-    valPlaceholder: "0,00",
     btnRegister: "Registrar",
     history: "Últimas Transações",
     noTransactions: "Nenhuma transação.",
@@ -3087,10 +3261,32 @@ const translations = {
     cardColor: "Cor do Cartão",
     cancel: "Cancelar",
     save: "Salvar",
-    accountBalance: "Saldo em Conta", // ATUALIZADO
+    accountBalance: "Saldo em Conta",
     descriptionLabel: "Descrição",
     valueLabel: "Valor",
     paymentHistoryLabel: "Forma de Pagamento",
+    profileTitle: "Meu Perfil",
+    fullNameLabel: "Nome Completo",
+    emailLabel: "E-mail",
+    phoneLabel: "Telefone",
+    profileDesc:
+      "Dados pessoais vinculados ao seu cadastro. Para alterações, entre em contato com o suporte.",
+    appearanceTitle: "Aparência",
+    darkModeLabel: "Modo Escuro (Dark Mode)",
+    darkModeDesc: "Altera o tema visual do aplicativo.",
+    securityTitle: "Segurança",
+    currentPassword: "Senha Atual",
+    newPassword: "Nova Senha",
+    confirmNewPassword: "Confirmar Nova Senha",
+    updatePassword: "Atualizar Senha",
+    errorSamePassword: "A nova senha deve ser diferente da atual.",
+    errorMismatch: "As novas senhas não coincidem.",
+    errorShortPassword: "A senha deve ter no mínimo 6 caracteres.",
+    successPasswordUpdate: "Senha atualizada com sucesso!",
+    errorPasswordUpdate:
+      "Erro ao trocar senha. Verifique se a senha atual está correta.",
+    languageTitle: "Idioma",
+    languageDesc: "Altera o idioma de toda a aplicação.",
     months: [
       "Janeiro",
       "Fevereiro",
@@ -3159,6 +3355,29 @@ const translations = {
     descriptionLabel: "Description",
     valueLabel: "Value",
     paymentHistoryLabel: "Payment Method",
+    profileTitle: "My Profile",
+    fullNameLabel: "Full Name",
+    emailLabel: "E-mail",
+    phoneLabel: "Phone",
+    profileDesc:
+      "Personal data linked to your account. For modifications, please contact support.",
+    appearanceTitle: "Appearance",
+    darkModeLabel: "Dark Mode",
+    darkModeDesc: "Changes the visual theme of the application.",
+    securityTitle: "Security",
+    currentPassword: "Current Password",
+    newPassword: "New Password",
+    confirmNewPassword: "Confirm New Password",
+    updatePassword: "Update Password",
+    errorSamePassword:
+      "The new password must be different from the current one.",
+    errorMismatch: "The new passwords do not match.",
+    errorShortPassword: "The password must be at least 6 characters long.",
+    successPasswordUpdate: "Password updated successfully!",
+    errorPasswordUpdate:
+      "Error changing password. Please check if your current password is correct.",
+    languageTitle: "Language",
+    languageDesc: "Change the application language.",
     months: [
       "January",
       "February",
@@ -3203,7 +3422,7 @@ const translations = {
     valPlaceholder: "0,00",
     btnRegister: "Registrar",
     history: "Últimas Transações",
-    noTransactions: "Aún no hay transações.",
+    noTransactions: "Aún no hay transacciones.",
     confirmDelete: "¿Eliminar?",
     errorValue: "Valor inválido.",
     selCategory: "Categoría",
@@ -3227,6 +3446,28 @@ const translations = {
     descriptionLabel: "Descripción",
     valueLabel: "Valor",
     paymentHistoryLabel: "Método de Pago",
+    profileTitle: "Mi Perfil",
+    fullNameLabel: "Nombre Completo",
+    emailLabel: "Correo",
+    phoneLabel: "Teléfono",
+    profileDesc:
+      "Datos personales vinculados a tu cuenta. Para modificaciones, contacta soporte.",
+    appearanceTitle: "Apariencia",
+    darkModeLabel: "Modo Oscuro (Dark Mode)",
+    darkModeDesc: "Cambia el tema visual de la aplicación.",
+    securityTitle: "Seguridad",
+    currentPassword: "Contraseña Actual",
+    newPassword: "Nueva Contraseña",
+    confirmNewPassword: "Confirmar Nueva Contraseña",
+    updatePassword: "Actualizar Contraseña",
+    errorSamePassword: "La nueva contraseña debe ser diferente a la actual.",
+    errorMismatch: "Las nuevas contraseñas no coinciden.",
+    errorShortPassword: "La contraseña debe tener al menos 6 caracteres.",
+    successPasswordUpdate: "¡Contraseña actualizada con éxito!",
+    errorPasswordUpdate:
+      "Error al cambiar la contraseña. Verifica si tu contraseña actual es correcta.",
+    languageTitle: "Idioma",
+    languageDesc: "Cambiar el idioma de la aplicación.",
     months: [
       "Enero",
       "Febrero",
@@ -3295,6 +3536,29 @@ const translations = {
     descriptionLabel: "Description",
     valueLabel: "Valeur",
     paymentHistoryLabel: "Méthode de Paiement",
+    profileTitle: "Mon Profil",
+    fullNameLabel: "Nom Complet",
+    emailLabel: "E-mail",
+    phoneLabel: "Téléphone",
+    profileDesc:
+      "Données personnelles liées à votre compte. Pour modifier, contactez le support.",
+    appearanceTitle: "Apparence",
+    darkModeLabel: "Mode Sombre",
+    darkModeDesc: "Modifie le thème visuel de l'application.",
+    securityTitle: "Sécurité",
+    currentPassword: "Mot de passe actuel",
+    newPassword: "Nouveau mot de passe",
+    confirmNewPassword: "Confirmer le nouveau mot de passe",
+    updatePassword: "Mettre à jour le mot de passe",
+    errorSamePassword:
+      "Le nouveau mot de passe doit être différent de l'actuel.",
+    errorMismatch: "Les nouveaux mots de passe ne correspondent pas.",
+    errorShortPassword: "Le mot de passe doit comporter au moins 6 caractères.",
+    successPasswordUpdate: "Mot de passe mis à jour avec succès !",
+    errorPasswordUpdate:
+      "Erreur lors du changement. Vérifiez votre mot de passe actuel.",
+    languageTitle: "Langue",
+    languageDesc: "Changer la langue de l'application.",
     months: [
       "Janvier",
       "Février",
@@ -3363,6 +3627,29 @@ const translations = {
     descriptionLabel: "Beschreibung",
     valueLabel: "Wert",
     paymentHistoryLabel: "Zahlungsmethode",
+    profileTitle: "Mein Profil",
+    fullNameLabel: "Vollständiger Name",
+    emailLabel: "E-Mail",
+    phoneLabel: "Telefon",
+    profileDesc:
+      "Personenbezogene Daten. Für Änderungen kontaktieren Sie den Support.",
+    appearanceTitle: "Erscheinungsbild",
+    darkModeLabel: "Dunkler Modus",
+    darkModeDesc: "Ändert das visuelle Design der App.",
+    securityTitle: "Sicherheit",
+    currentPassword: "Aktuelles Passwort",
+    newPassword: "Neues Passwort",
+    confirmNewPassword: "Neues Passwort bestätigen",
+    updatePassword: "Passwort aktualisieren",
+    errorSamePassword:
+      "Das neue Passwort muss sich vom aktuellen unterscheiden.",
+    errorMismatch: "Die neuen Passwörter stimmen nicht überein.",
+    errorShortPassword: "Das Passwort muss mindestens 6 Zeichen lang sein.",
+    successPasswordUpdate: "Passwort erfolgreich aktualisiert!",
+    errorPasswordUpdate:
+      "Fehler beim Ändern. Überprüfen Sie Ihr aktuelles Passwort.",
+    languageTitle: "Sprache",
+    languageDesc: "Ändern Sie die Sprache der Anwendung.",
     months: [
       "Januar",
       "Februar",
@@ -3431,6 +3718,29 @@ const translations = {
     descriptionLabel: "Descrizione",
     valueLabel: "Valore",
     paymentHistoryLabel: "Metodo di Pagamento",
+    profileTitle: "Il Mio Profilo",
+    fullNameLabel: "Nome Completo",
+    emailLabel: "E-mail",
+    phoneLabel: "Telefono",
+    profileDesc:
+      "Dati personali collegati. Per modifiche, contattare il supporto.",
+    appearanceTitle: "Aspetto",
+    darkModeLabel: "Modalità Scura",
+    darkModeDesc: "Modifica il tema visivo dell'applicazione.",
+    securityTitle: "Sicurezza",
+    currentPassword: "Password Attuale",
+    newPassword: "Nuova Password",
+    confirmNewPassword: "Conferma Nuova Password",
+    updatePassword: "Aggiorna Password",
+    errorSamePassword:
+      "La nuova password deve essere diversa da quella attuale.",
+    errorMismatch: "Le nuove password non corrispondono.",
+    errorShortPassword: "La password deve contenere almeno 6 caratteri.",
+    successPasswordUpdate: "Password aggiornata con successo!",
+    errorPasswordUpdate:
+      "Errore. Verifica se la tua password attuale è corretta.",
+    languageTitle: "Lingua",
+    languageDesc: "Cambia la lingua dell'applicazione.",
     months: [
       "Gennaio",
       "Febbraio",
@@ -3499,6 +3809,28 @@ const translations = {
     descriptionLabel: "説明",
     valueLabel: "価値",
     paymentHistoryLabel: "支払方法",
+    profileTitle: "マイプロフィール",
+    fullNameLabel: "フルネーム",
+    emailLabel: "メール",
+    phoneLabel: "電話番号",
+    profileDesc:
+      "アカウントに関連付けられた個人データです。変更についてはサポートにお問い合わせください。",
+    appearanceTitle: "外観",
+    darkModeLabel: "ダークモード",
+    darkModeDesc: "アプリの視覚テーマを変更します。",
+    securityTitle: "セキュリティ",
+    currentPassword: "現在のパスワード",
+    newPassword: "新しいパスワード",
+    confirmNewPassword: "新しいパスワードの確認",
+    updatePassword: "パスワードを更新",
+    errorSamePassword:
+      "新しいパスワードは現在のパスワードと異なる必要があります。",
+    errorMismatch: "新しいパスワードが一致しません。",
+    errorShortPassword: "パスワードは6文字以上にする必要があります。",
+    successPasswordUpdate: "パスワードが正常に更新されました！",
+    errorPasswordUpdate: "エラー。現在のパスワードが正しいか確認してください。",
+    languageTitle: "言語",
+    languageDesc: "アプリケーションの言語を変更します。",
     months: [
       "1月",
       "2月",
@@ -3567,6 +3899,26 @@ const translations = {
     descriptionLabel: "描述",
     valueLabel: "价值",
     paymentHistoryLabel: "支付方式",
+    profileTitle: "我的资料",
+    fullNameLabel: "全名",
+    emailLabel: "电子邮件",
+    phoneLabel: "电话号码",
+    profileDesc: "与您的注册相关的个人数据。如需修改，请联系支持。",
+    appearanceTitle: "外观",
+    darkModeLabel: "深色模式",
+    darkModeDesc: "更改应用程序的视觉主题。",
+    securityTitle: "安全",
+    currentPassword: "当前密码",
+    newPassword: "新密码",
+    confirmNewPassword: "确认新密码",
+    updatePassword: "更新密码",
+    errorSamePassword: "新密码必须与当前密码不同。",
+    errorMismatch: "新密码不匹配。",
+    errorShortPassword: "密码必须至少有 6 个字符。",
+    successPasswordUpdate: "密码更新成功！",
+    errorPasswordUpdate: "更改错误。请检查当前密码。",
+    languageTitle: "语言",
+    languageDesc: "更改应用程序语言。",
     months: [
       "一月",
       "二月",
@@ -3635,6 +3987,27 @@ const translations = {
     descriptionLabel: "설명",
     valueLabel: "가치",
     paymentHistoryLabel: "결제 방법",
+    profileTitle: "내 프로필",
+    fullNameLabel: "성명",
+    emailLabel: "이메일",
+    phoneLabel: "전화번호",
+    profileDesc:
+      "귀하의 계정과 연결된 개인 데이터입니다. 수정을 원하시면 지원팀에 문의하십시오.",
+    appearanceTitle: "모양",
+    darkModeLabel: "다크 모드",
+    darkModeDesc: "앱의 시각적 테마를 변경합니다.",
+    securityTitle: "보안",
+    currentPassword: "현재 비밀번호",
+    newPassword: "새 비밀번호",
+    confirmNewPassword: "새 비밀번호 확인",
+    updatePassword: "비밀번호 업데이트",
+    errorSamePassword: "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+    errorMismatch: "새 비밀번호가 일치하지 않습니다.",
+    errorShortPassword: "비밀번호는 6자 이상이어야 합니다.",
+    successPasswordUpdate: "비밀번호가 성공적으로 업데이트되었습니다!",
+    errorPasswordUpdate: "변경 오류. 현재 비밀번호를 확인하십시오.",
+    languageTitle: "언어",
+    languageDesc: "애플리케이션 언어를 변경합니다.",
     months: [
       "1월",
       "2월",

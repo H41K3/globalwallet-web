@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
-// Puxando o seu logo.png normal
-import logoImg from "../assets/logo.png";
 import bgImg from "../assets/loginbackground.png";
 
-// LOGO REVERTIDA: Caixa branca, cantos arredondados, sombra e scale(1.3)
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+
 const AppLogo = ({ size = 45 }: { size?: number }) => (
   <div
     style={{
@@ -22,7 +21,7 @@ const AppLogo = ({ size = 45 }: { size?: number }) => (
     }}
   >
     <img
-      src={logoImg}
+      src="/logo.png"
       alt="Logo GlobalWallet"
       style={{
         height: "100%",
@@ -67,7 +66,21 @@ const EyeSlashIcon = () => (
 
 export function Register() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+
+  const [idioma, setIdioma] = useState<IdiomaType>(
+    (localStorage.getItem("idioma") as IdiomaType) || "en",
+  );
+  const [menuIdiomaAberto, setMenuIdiomaAberto] = useState(false);
+  const menuIdiomaRef = useRef<HTMLDivElement>(null);
+  const t = translations[idioma];
+
+  const [fullName, setFullName] = useState("");
+  const [cpf, setCpf] = useState("");
+
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -83,12 +96,33 @@ export function Register() {
   const isConfirmPasswordVisible =
     isConfirmPermanentlyShown || isConfirmTemporarilyShown;
 
+  useEffect(() => {
+    localStorage.setItem("idioma", idioma);
+  }, [idioma]);
+
+  useEffect(() => {
+    const handleClickFora = (event: MouseEvent) => {
+      if (
+        menuIdiomaRef.current &&
+        !menuIdiomaRef.current.contains(event.target as Node)
+      ) {
+        setMenuIdiomaAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, []);
+
+  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
+    (a, b) => t.langs[a].localeCompare(t.langs[b]),
+  );
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem.");
+      setError(t.errorMismatch);
       return;
     }
 
@@ -96,17 +130,22 @@ export function Register() {
       await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/auth/register",
         {
-          login: username,
-          password: password,
+          fullName,
+          cpf: cpf.replace(/\D/g, ""),
+          email,
+          phone: `${phoneCode} ${phone}`,
+          password,
         },
       );
-      alert("Conta criada com sucesso!");
-      // CORREÇÃO AQUI: Força a aba inicial sempre ser a 'home' se o usuário for direcionado para o app
+
+      alert(t.successMsg);
+      const primeiroNome = fullName.split(" ")[0];
+      localStorage.setItem("usuario", primeiroNome);
       localStorage.setItem("abaAtiva", "home");
       navigate("/");
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
-      setError("Erro ao criar conta. Escolha outro nome de usuário.");
+      setError(t.errorGeneral);
     }
   };
 
@@ -128,7 +167,6 @@ export function Register() {
         boxSizing: "border-box",
       }}
     >
-      {/* CAMADA DE FUNDO (Igual ao Login) */}
       <div
         style={{
           position: "absolute",
@@ -145,41 +183,115 @@ export function Register() {
         }}
       />
 
-      {/* CONTEÚDO (Elevado com zIndex 1) */}
       <div
         style={{
           position: "relative",
           zIndex: 1,
           backgroundColor: "#fff",
-          padding: "3rem",
+          padding: "2.5rem",
           borderRadius: "24px",
           boxShadow: "0 10px 40px rgba(0,0,0,0.06)",
           width: "100%",
-          maxWidth: "400px",
+          maxWidth: "450px",
+          maxHeight: "90vh",
+          overflowY: "auto",
           textAlign: "center",
           boxSizing: "border-box",
         }}
       >
+        <div
+          ref={menuIdiomaRef}
+          style={{ position: "absolute", top: "20px", right: "20px" }}
+        >
+          <button
+            type="button"
+            onClick={() => setMenuIdiomaAberto(!menuIdiomaAberto)}
+            style={{
+              background: "#f5f5f5",
+              border: "1px solid #eaeaea",
+              borderRadius: "22px",
+              padding: "6px 10px",
+              fontSize: "1rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              color: "#333",
+            }}
+          >
+            {t.flag} <span style={{ fontSize: "0.7rem", opacity: 0.8 }}>▼</span>
+          </button>
+          {menuIdiomaAberto && (
+            <div
+              style={{
+                position: "absolute",
+                top: "40px",
+                right: 0,
+                backgroundColor: "#fff",
+                borderRadius: "12px",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                padding: "10px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "8px",
+                zIndex: 1001,
+                minWidth: "220px",
+              }}
+            >
+              {idiomasOrdenados.map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => {
+                    setIdioma(lang);
+                    setMenuIdiomaAberto(false);
+                  }}
+                  style={{
+                    background: idioma === lang ? "#f5f5f5" : "transparent",
+                    border: "none",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "0.85rem",
+                    color: "#333",
+                    textAlign: "left",
+                    fontWeight: idioma === lang ? "bold" : "normal",
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>
+                    {translations[lang].flag}
+                  </span>{" "}
+                  {t.langs[lang]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "15px",
-            marginBottom: "2.5rem",
+            marginBottom: "2rem",
+            marginTop: "1rem",
           }}
         >
-          <AppLogo />
+          <AppLogo size={40} />
           <h1
             style={{
               margin: 0,
-              fontSize: "1.8rem",
+              fontSize: "1.6rem",
               fontWeight: "700",
               color: "#111",
               letterSpacing: "0.5px",
             }}
           >
-            GlobalWallet
+            {t.title}
           </h1>
         </div>
 
@@ -214,24 +326,145 @@ export function Register() {
                 textTransform: "uppercase",
               }}
             >
-              Novo Nome de usuário
+              {t.fullNameLabel}
             </label>
             <input
               type="text"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               style={{
                 width: "100%",
-                padding: "12px 16px",
-                borderRadius: "12px",
+                padding: "10px 14px",
+                borderRadius: "10px",
                 border: "1px solid #eaeaea",
-                backgroundColor: "#fafafa",
+                backgroundColor: "transparent",
                 outline: "none",
                 fontSize: "0.95rem",
                 boxSizing: "border-box",
               }}
             />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              textAlign: "left",
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontSize: "0.8rem",
+                  color: "#888",
+                  fontWeight: "600",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t.cpfLabel}
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={14}
+                value={cpf}
+                onChange={(e) => {
+                  let v = e.target.value.replace(/\D/g, "");
+                  if (v.length > 11) v = v.slice(0, 11);
+                  v = v.replace(/(\d{3})(\d)/, "$1.$2");
+                  v = v.replace(/(\d{3})(\d)/, "$1.$2");
+                  v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+                  setCpf(v);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #eaeaea",
+                  backgroundColor: "transparent",
+                  outline: "none",
+                  fontSize: "0.95rem",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontSize: "0.8rem",
+                  color: "#888",
+                  fontWeight: "600",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t.phoneLabel}
+              </label>
+
+              <div
+                style={{
+                  display: "flex",
+                  borderRadius: "10px",
+                  border: "1px solid #eaeaea",
+                  backgroundColor: "transparent",
+                  overflow: "hidden",
+                }}
+              >
+                <select
+                  required
+                  value={phoneCode}
+                  onChange={(e) => setPhoneCode(e.target.value)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    padding: "10px 5px 10px 10px",
+                    outline: "none",
+                    borderRight: "1px solid #eaeaea",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    color: "#333",
+                    WebkitAppearance: "none",
+                    MozAppearance: "none",
+                  }}
+                >
+                  <option value="" disabled>
+                    🌍 --
+                  </option>
+                  {countryPhoneCodes.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  required
+                  maxLength={15}
+                  value={phone}
+                  onChange={(e) => {
+                    let v = e.target.value.replace(/\D/g, "");
+                    if (v.length > 11) v = v.slice(0, 11);
+                    if (v.length > 2) v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+                    if (v.length > 9) v = v.replace(/(\d)(\d{4})$/, "$1-$2");
+                    setPhone(v);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 10px",
+                    border: "none",
+                    backgroundColor: "transparent",
+                    outline: "none",
+                    fontSize: "0.95rem",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           <div style={{ textAlign: "left" }}>
@@ -245,54 +478,35 @@ export function Register() {
                 textTransform: "uppercase",
               }}
             >
-              Nova Senha
+              {t.emailLabel}
             </label>
-            <div style={{ position: "relative", width: "100%" }}>
-              <input
-                type={isPasswordVisible ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px 42px 12px 16px",
-                  borderRadius: "12px",
-                  border: "1px solid #eaeaea",
-                  backgroundColor: "#fafafa",
-                  outline: "none",
-                  fontSize: "0.95rem",
-                  boxSizing: "border-box",
-                }}
-              />
-              <button
-                type="button"
-                style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onClick={() => setIsPermanentlyShown((prev) => !prev)}
-                onMouseDown={() => setIsTemporarilyShown(true)}
-                onMouseUp={() => setIsTemporarilyShown(false)}
-                onMouseLeave={() => setIsTemporarilyShown(false)}
-                onTouchStart={() => setIsTemporarilyShown(true)}
-                onTouchEnd={() => setIsTemporarilyShown(false)}
-              >
-                {isPermanentlyShown ? <EyeIcon /> : <EyeSlashIcon />}
-              </button>
-            </div>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: "10px",
+                border: "1px solid #eaeaea",
+                backgroundColor: "transparent",
+                outline: "none",
+                fontSize: "0.95rem",
+                boxSizing: "border-box",
+              }}
+            />
           </div>
 
-          {password.length > 0 && (
-            <div style={{ textAlign: "left" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              textAlign: "left",
+            }}
+          >
+            <div>
               <label
                 style={{
                   display: "block",
@@ -303,20 +517,20 @@ export function Register() {
                   textTransform: "uppercase",
                 }}
               >
-                Confirmar Senha
+                {t.passwordLabel}
               </label>
               <div style={{ position: "relative", width: "100%" }}>
                 <input
-                  type={isConfirmPasswordVisible ? "text" : "password"}
+                  type={isPasswordVisible ? "text" : "password"}
                   required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   style={{
                     width: "100%",
-                    padding: "12px 42px 12px 16px",
-                    borderRadius: "12px",
+                    padding: "10px 36px 10px 14px",
+                    borderRadius: "10px",
                     border: "1px solid #eaeaea",
-                    backgroundColor: "#fafafa",
+                    backgroundColor: "transparent",
                     outline: "none",
                     fontSize: "0.95rem",
                     boxSizing: "border-box",
@@ -326,20 +540,71 @@ export function Register() {
                   type="button"
                   style={{
                     position: "absolute",
-                    right: "12px",
+                    right: "8px",
                     top: "50%",
                     transform: "translateY(-50%)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    padding: "4px",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    padding: "2px",
+                  }}
+                  onClick={() => setIsPermanentlyShown((prev) => !prev)}
+                  onMouseEnter={() => setIsTemporarilyShown(true)}
+                  onMouseLeave={() => setIsTemporarilyShown(false)}
+                  onTouchStart={() => setIsTemporarilyShown(true)}
+                  onTouchEnd={() => setIsTemporarilyShown(false)}
+                >
+                  {isPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontSize: "0.8rem",
+                  color: "#888",
+                  fontWeight: "600",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t.confirmPasswordLabel}
+              </label>
+              <div style={{ position: "relative", width: "100%" }}>
+                <input
+                  type={isConfirmPasswordVisible ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 36px 10px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #eaeaea",
+                    backgroundColor: "transparent",
+                    outline: "none",
+                    fontSize: "0.95rem",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: "8px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    padding: "2px",
                   }}
                   onClick={() => setIsConfirmPermanentlyShown((prev) => !prev)}
-                  onMouseDown={() => setIsConfirmTemporarilyShown(true)}
-                  onMouseUp={() => setIsConfirmTemporarilyShown(false)}
+                  onMouseEnter={() => setIsConfirmTemporarilyShown(true)}
                   onMouseLeave={() => setIsConfirmTemporarilyShown(false)}
                   onTouchStart={() => setIsConfirmTemporarilyShown(true)}
                   onTouchEnd={() => setIsConfirmTemporarilyShown(false)}
@@ -348,14 +613,14 @@ export function Register() {
                 </button>
               </div>
             </div>
-          )}
+          </div>
 
           <button
             type="submit"
             style={{
-              marginTop: "1.5rem",
+              marginTop: "1rem",
               padding: "14px 20px",
-              backgroundColor: "#EC0000",
+              backgroundColor: "#d91616",
               color: "white",
               border: "none",
               borderRadius: "15px",
@@ -363,34 +628,295 @@ export function Register() {
               cursor: "pointer",
               fontSize: "1.0rem",
               width: "100%",
-              boxShadow: "0 5px 15px rgba(236,0,0,0.25)",
             }}
           >
-            Criar Conta
+            {t.registerBtn}
           </button>
         </form>
 
-        <p
-          style={{
-            marginTop: "2rem",
-            fontSize: "0.9rem",
-            color: "#666",
-            margin: "2rem 0 0 0",
-          }}
-        >
-          Já tem uma conta?{" "}
+        <p style={{ marginTop: "1.5rem", fontSize: "0.9rem", color: "#666" }}>
+          {t.hasAccount}{" "}
           <Link
             to="/"
             style={{
-              color: "#EC0000",
+              color: "#d91616",
               fontWeight: "600",
               textDecoration: "underline",
             }}
           >
-            Faça Login
+            {t.loginLink}
           </Link>
         </p>
       </div>
     </div>
   );
 }
+
+const countryPhoneCodes = [
+  { code: "+1", label: "🇺🇸 +1" },
+  { code: "+55", label: "🇧🇷 +55" },
+  { code: "+34", label: "🇪🇸 +34" },
+  { code: "+33", label: "🇫🇷 +33" },
+  { code: "+49", label: "🇩🇪 +49" },
+  { code: "+39", label: "🇮🇹 +39" },
+  { code: "+81", label: "🇯🇵 +81" },
+  { code: "+86", label: "🇨🇳 +86" },
+  { code: "+82", label: "🇰🇷 +82" },
+];
+
+const translations = {
+  pt: {
+    flag: "🇧🇷",
+    langs: {
+      pt: "Português",
+      en: "Inglês",
+      es: "Espanhol",
+      fr: "Francês",
+      de: "Alemão",
+      it: "Italiano",
+      ja: "Japonês",
+      zh: "Chinês",
+      ko: "Coreano",
+    },
+    title: "Criar Conta",
+    fullNameLabel: "Nome Completo",
+    cpfLabel: "CPF",
+    phoneLabel: "Telefone",
+    emailLabel: "E-mail",
+    passwordLabel: "Senha",
+    confirmPasswordLabel: "Confirmar Senha",
+    registerBtn: "Cadastrar",
+    hasAccount: "Já tem uma conta?",
+    loginLink: "Faça Login",
+    errorMismatch: "As senhas não coincidem.",
+    errorGeneral:
+      "Erro ao criar conta. Este CPF ou E-mail já pode estar em uso.",
+    successMsg: "Conta criada com sucesso! Faça login para continuar.",
+  },
+  en: {
+    flag: "🇺🇸",
+    langs: {
+      pt: "Portuguese",
+      en: "English",
+      es: "Spanish",
+      fr: "French",
+      de: "German",
+      it: "Italian",
+      ja: "Japanese",
+      zh: "Chinese",
+      ko: "Korean",
+    },
+    title: "Create Account",
+    fullNameLabel: "Full Name",
+    cpfLabel: "ID / CPF",
+    phoneLabel: "Phone",
+    emailLabel: "E-mail",
+    passwordLabel: "Password",
+    confirmPasswordLabel: "Confirm Password",
+    registerBtn: "Sign Up",
+    hasAccount: "Already have an account?",
+    loginLink: "Log In",
+    errorMismatch: "Passwords do not match.",
+    errorGeneral:
+      "Error creating account. This ID or E-mail may already be in use.",
+    successMsg: "Account created successfully! Please log in to continue.",
+  },
+  es: {
+    flag: "🇪🇸",
+    langs: {
+      pt: "Portugués",
+      en: "Inglés",
+      es: "Español",
+      fr: "Francés",
+      de: "Alemán",
+      it: "Italiano",
+      ja: "Japonés",
+      zh: "Chino",
+      ko: "Coreano",
+    },
+    title: "Crear Cuenta",
+    fullNameLabel: "Nombre Completo",
+    cpfLabel: "Identificación / CPF",
+    phoneLabel: "Teléfono",
+    emailLabel: "Correo",
+    passwordLabel: "Contraseña",
+    confirmPasswordLabel: "Confirmar Contraseña",
+    registerBtn: "Regístrate",
+    hasAccount: "¿Ya tienes una cuenta?",
+    loginLink: "Entrar",
+    errorMismatch: "Las contraseñas no coinciden.",
+    errorGeneral:
+      "Error al crear la cuenta. Esta Identificación o Correo puede estar en uso.",
+    successMsg: "¡Cuenta creada con éxito! Inicia sesión para continuar.",
+  },
+  fr: {
+    flag: "🇫🇷",
+    langs: {
+      pt: "Portugais",
+      en: "Anglais",
+      es: "Espagnol",
+      fr: "Français",
+      de: "Allemand",
+      it: "Italien",
+      ja: "Japonais",
+      zh: "Chinois",
+      ko: "Coréen",
+    },
+    title: "Créer un Compte",
+    fullNameLabel: "Nom Complet",
+    cpfLabel: "ID / CPF",
+    phoneLabel: "Téléphone",
+    emailLabel: "E-mail",
+    passwordLabel: "Mot de passe",
+    confirmPasswordLabel: "Confirmer",
+    registerBtn: "S'inscrire",
+    hasAccount: "Vous avez déjà un compte?",
+    loginLink: "Se connecter",
+    errorMismatch: "Les mots de passe ne correspondent pas.",
+    errorGeneral:
+      "Erreur de création. Cet ID ou E-mail est peut-être déjà utilisé.",
+    successMsg:
+      "Compte créé avec succès! Veuillez vous connecter pour continuer.",
+  },
+  de: {
+    flag: "🇩🇪",
+    langs: {
+      pt: "Portugiesisch",
+      en: "Englisch",
+      es: "Spanisch",
+      fr: "Französisch",
+      de: "Deutsch",
+      it: "Italienisch",
+      ja: "Japanisch",
+      zh: "Chinesisch",
+      ko: "Koreanisch",
+    },
+    title: "Konto Erstellen",
+    fullNameLabel: "Vollständiger Name",
+    cpfLabel: "Ausweis / CPF",
+    phoneLabel: "Telefon",
+    emailLabel: "E-Mail",
+    passwordLabel: "Passwort",
+    confirmPasswordLabel: "Bestätigen",
+    registerBtn: "Registrieren",
+    hasAccount: "Haben Sie bereits ein Konto?",
+    loginLink: "Anmelden",
+    errorMismatch: "Passwörter stimmen nicht überein.",
+    errorGeneral:
+      "Fehler beim Erstellen. Diese ID oder E-Mail könnte bereits verwendet werden.",
+    successMsg:
+      "Konto erfolgreich erstellt! Bitte melden Sie sich an, um fortzufahren.",
+  },
+  it: {
+    flag: "🇮🇹",
+    langs: {
+      pt: "Portoghese",
+      en: "Inglese",
+      es: "Spagnolo",
+      fr: "Francese",
+      de: "Tedesco",
+      it: "Italiano",
+      ja: "Giapponese",
+      zh: "Cinese",
+      ko: "Coreano",
+    },
+    title: "Crea Account",
+    fullNameLabel: "Nome Completo",
+    cpfLabel: "Documento / CPF",
+    phoneLabel: "Telefono",
+    emailLabel: "E-mail",
+    passwordLabel: "Password",
+    confirmPasswordLabel: "Conferma",
+    registerBtn: "Iscriviti",
+    hasAccount: "Hai già un account?",
+    loginLink: "Accedi",
+    errorMismatch: "Le password non corrispondono.",
+    errorGeneral:
+      "Errore durante la creazione. Questo ID o e-mail potrebbe essere già in uso.",
+    successMsg: "Account creato con successo! Accedi per continuare.",
+  },
+  ja: {
+    flag: "🇯🇵",
+    langs: {
+      pt: "ポルトガル語",
+      en: "英語",
+      es: "スペイン語",
+      fr: "フランス語",
+      de: "ドイツ語",
+      it: "イタリア語",
+      ja: "日本語",
+      zh: "中国語",
+      ko: "韓国語",
+    },
+    title: "アカウント作成",
+    fullNameLabel: "フルネーム",
+    cpfLabel: "身分証明書 / CPF",
+    phoneLabel: "電話番号",
+    emailLabel: "メール",
+    passwordLabel: "パスワード",
+    confirmPasswordLabel: "パスワード確認",
+    registerBtn: "登録",
+    hasAccount: "すでにアカウントをお持ちですか？",
+    loginLink: "ログイン",
+    errorMismatch: "パスワードが一致しません。",
+    errorGeneral:
+      "エラー。このIDまたはメールはすでに使用されている可能性があります。",
+    successMsg:
+      "アカウントが正常に作成されました！続行するにはログインしてください。",
+  },
+  zh: {
+    flag: "🇨🇳",
+    langs: {
+      pt: "葡萄牙语",
+      en: "英语",
+      es: "西班牙语",
+      fr: "法语",
+      de: "德语",
+      it: "意大利语",
+      ja: "日语",
+      zh: "中文",
+      ko: "韩语",
+    },
+    title: "创建账号",
+    fullNameLabel: "全名",
+    cpfLabel: "身份证 / CPF",
+    phoneLabel: "电话号码",
+    emailLabel: "电子邮件",
+    passwordLabel: "密码",
+    confirmPasswordLabel: "确认密码",
+    registerBtn: "注册",
+    hasAccount: "已有账号？",
+    loginLink: "登录",
+    errorMismatch: "密码不匹配。",
+    errorGeneral: "创建账号错误。此ID或电邮可能已被使用。",
+    successMsg: "账号创建成功！请登录以继续。",
+  },
+  ko: {
+    flag: "🇰🇷",
+    langs: {
+      pt: "포르투갈어",
+      en: "英語",
+      es: "スペイン語",
+      fr: "フランス語",
+      de: "ドイツ語",
+      it: "イタリア語",
+      ja: "日本語",
+      zh: "中国語",
+      ko: "한국어",
+    },
+    title: "계정 만들기",
+    fullNameLabel: "성명",
+    cpfLabel: "신분증 / CPF",
+    phoneLabel: "전화번호",
+    emailLabel: "이메일",
+    passwordLabel: "비밀번호",
+    confirmPasswordLabel: "비밀번호 확인",
+    registerBtn: "가입하기",
+    hasAccount: "이미 계정이 있으신가요?",
+    loginLink: "로그인",
+    errorMismatch: "비밀번호가 일치하지 않습니다.",
+    errorGeneral:
+      "계정 생성 오류. 이 ID 또는 이메일은 이미 사용 중일 수 있습니다.",
+    successMsg: "계정이 성공적으로 생성되었습니다! 계속하려면 로그인하십시오.",
+  },
+};
