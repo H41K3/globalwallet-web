@@ -13,6 +13,7 @@ interface Transacao {
   type?: string;
   category?: string;
   card?: Cartao;
+  paymentMethod?: string; // NOVO: "PIX", "ACCOUNT" ou "CARD"
 }
 
 interface Cartao {
@@ -75,8 +76,7 @@ const CategoryOption = ({
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        if (!isSelected)
-          e.currentTarget.style.backgroundColor = theme.highlightBg;
+        if (!isSelected) e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
         if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
@@ -97,14 +97,16 @@ const CategoryOption = ({
 };
 
 const PaymentMethodOption = ({
+  tipo,
   card,
-  t,
+  label,
   onSelect,
   isSelected,
   theme,
 }: {
+  tipo: "ACCOUNT" | "PIX" | "CARD";
   card?: Cartao;
-  t: (typeof translations)["pt"];
+  label: string;
   onSelect: () => void;
   isSelected: boolean;
   theme: ThemeType;
@@ -124,14 +126,41 @@ const PaymentMethodOption = ({
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        if (!isSelected)
-          e.currentTarget.style.backgroundColor = theme.highlightBg;
+        if (!isSelected) e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
         if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
       }}
     >
-      {card ? (
+      {tipo === "PIX" && (
+        <>
+          <span style={{ fontSize: "1.1rem" }}>⚡</span>
+          <span
+            style={{
+              fontWeight: isSelected ? "600" : "500",
+              color: isSelected ? theme.textMain : theme.textSec,
+              fontSize: "0.85rem",
+            }}
+          >
+            {label}
+          </span>
+        </>
+      )}
+      {tipo === "ACCOUNT" && (
+        <>
+          <span style={{ fontSize: "1.1rem" }}>🏦</span>
+          <span
+            style={{
+              fontWeight: isSelected ? "600" : "500",
+              color: isSelected ? theme.textMain : theme.textSec,
+              fontSize: "0.85rem",
+            }}
+          >
+            {label}
+          </span>
+        </>
+      )}
+      {tipo === "CARD" && card && (
         <>
           <span
             style={{
@@ -148,20 +177,7 @@ const PaymentMethodOption = ({
               fontSize: "0.85rem",
             }}
           >
-            {card.nome || card.name} ({card.lastDigits})
-          </span>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: "1.1rem" }}>🏦</span>
-          <span
-            style={{
-              fontWeight: isSelected ? "600" : "500",
-              color: isSelected ? theme.textMain : theme.textSec,
-              fontSize: "0.85rem",
-            }}
-          >
-            {t.accountBalance}
+            {label} ({card.lastDigits})
           </span>
         </>
       )}
@@ -176,15 +192,15 @@ export function Dashboard() {
   // 1. ESTADOS GLOBAIS E TEMA
   // ==========================================
   const [abaAtiva, setAbaAtiva] = useState<AbaType>(
-    (localStorage.getItem("abaAtiva") as AbaType) || "home",
+    (localStorage.getItem("abaAtiva") as AbaType) || "home"
   );
 
   const [idioma, setIdioma] = useState<IdiomaType>(
-    (localStorage.getItem("idioma") as IdiomaType) || "en",
+    (localStorage.getItem("idioma") as IdiomaType) || "pt"
   );
 
   const [isDarkMode, setIsDarkMode] = useState(
-    () => localStorage.getItem("theme") === "dark",
+    () => localStorage.getItem("theme") === "dark"
   );
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -196,12 +212,11 @@ export function Dashboard() {
   }, []);
 
   const [menuAberto, setMenuAberto] = useState(false);
-  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">(
-    "BRL",
-  );
+  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">("BRL");
   const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
 
-  const t = translations[idioma];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const t: any = translations[idioma];
 
   const theme: ThemeType = isDarkMode
     ? {
@@ -274,15 +289,12 @@ export function Dashboard() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [novaDescricao, setNovaDescricao] = useState("");
   const [novoValor, setNovoValor] = useState("");
-  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<
-    "INCOME" | "EXPENSE"
-  >("EXPENSE");
-  const [categoriaSelecionada, setCategoriaSelecionada] =
-    useState<string>("OTHER");
+  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<"INCOME" | "EXPENSE">("EXPENSE");
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>("OTHER");
   const [menuCategoriaAberto, setMenuCategoriaAberto] = useState(false);
   const menuCategoriaRef = useRef<HTMLDivElement>(null);
 
-  const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState<string>("");
+  const [formaPagamento, setFormaPagamento] = useState<string>("PIX");
   const [menuCartaoAberto, setMenuCartaoAberto] = useState(false);
   const menuCartaoRef = useRef<HTMLDivElement>(null);
 
@@ -333,21 +345,15 @@ export function Dashboard() {
 
   useEffect(() => {
     const handleClickFora = (event: MouseEvent) => {
-      if (
-        menuCategoriaRef.current &&
-        !menuCategoriaRef.current.contains(event.target as Node)
-      )
+      if (menuCategoriaRef.current && !menuCategoriaRef.current.contains(event.target as Node)) {
         setMenuCategoriaAberto(false);
-      if (
-        menuCartaoRef.current &&
-        !menuCartaoRef.current.contains(event.target as Node)
-      )
+      }
+      if (menuCartaoRef.current && !menuCartaoRef.current.contains(event.target as Node)) {
         setMenuCartaoAberto(false);
-      if (
-        monthPickerRef.current &&
-        !monthPickerRef.current.contains(event.target as Node)
-      )
+      }
+      if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
         setIsMonthPickerOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickFora);
     return () => document.removeEventListener("mousedown", handleClickFora);
@@ -357,10 +363,16 @@ export function Dashboard() {
     const categoriasValidas = getCategoriasDisponiveis();
     if (!categoriasValidas.includes(categoriaSelecionada)) {
       setCategoriaSelecionada(
-        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
+        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER"
       );
     }
-    if (tipoTransacaoSelecionado === "INCOME") setCartaoSelecionadoId("");
+    
+    // Se mudou para entrada, reseta a forma de pagamento para PIX se estiver com cartão selecionado
+    if (tipoTransacaoSelecionado === "INCOME") {
+      if (formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX") {
+        setFormaPagamento("PIX");
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoTransacaoSelecionado]);
 
@@ -368,10 +380,7 @@ export function Dashboard() {
     e.preventDefault();
 
     if (novaSenha === senhaAtual) {
-      showToast(
-        t.errorSamePassword || "A nova senha deve ser diferente da atual.",
-        "error",
-      );
+      showToast(t.errorSamePassword || "A nova senha deve ser diferente da atual.", "error");
       return;
     }
     if (novaSenha !== confirmarNovaSenha) {
@@ -379,10 +388,7 @@ export function Dashboard() {
       return;
     }
     if (novaSenha.length < 6) {
-      showToast(
-        t.errorShortPassword || "A senha deve ter no mínimo 6 caracteres.",
-        "error",
-      );
+      showToast(t.errorShortPassword || "A senha deve ter no mínimo 6 caracteres.", "error");
       return;
     }
 
@@ -392,21 +398,17 @@ export function Dashboard() {
       await axios.put(
         "https://swiss-project-api.onrender.com/api/v1/auth/change-password",
         { currentPassword: senhaAtual, newPassword: novaSenha },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      showToast(
-        t.successPasswordUpdate || "Senha atualizada com sucesso!",
-        "success",
-      );
+      showToast(t.successPasswordUpdate || "Senha atualizada com sucesso!", "success");
       setSenhaAtual("");
       setNovaSenha("");
       setConfirmarNovaSenha("");
     } catch (erro) {
       console.error(erro);
       showToast(
-        t.errorPasswordUpdate ||
-          "Erro ao trocar senha. Verifique se a senha atual está correta.",
-        "error",
+        t.errorPasswordUpdate || "Erro ao trocar senha. Verifique se a senha atual está correta.",
+        "error"
       );
     } finally {
       setIsLoading(false);
@@ -418,14 +420,12 @@ export function Dashboard() {
     if (!token) return navigate("/");
     try {
       const [resSaldo, resTrans, resPerfil] = await Promise.all([
-        axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
-        axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions",
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
+        axios.get("https://swiss-project-api.onrender.com/api/v1/transactions/balance", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get("https://swiss-project-api.onrender.com/api/v1/transactions", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
         axios.get("https://swiss-project-api.onrender.com/api/v1/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -433,12 +433,12 @@ export function Dashboard() {
       setSaldo(
         resSaldo.data.balance !== undefined
           ? resSaldo.data.balance
-          : resSaldo.data,
+          : resSaldo.data
       );
       setTransacoes(
         Array.isArray(resTrans.data)
           ? resTrans.data
-          : resTrans.data.content || [],
+          : resTrans.data.content || []
       );
       if (resPerfil && resPerfil.data) setPerfilUsuario(resPerfil.data);
     } catch (erro) {
@@ -449,9 +449,7 @@ export function Dashboard() {
 
   const buscarCotacoes = async () => {
     try {
-      const res = await axios.get(
-        "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL",
-      );
+      const res = await axios.get("https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL");
       setCotacoes({
         usd: parseFloat(res.data.USDBRL.bid),
         eur: parseFloat(res.data.EURBRL.bid),
@@ -485,30 +483,33 @@ export function Dashboard() {
       }
 
       let valorParaSalvar = valorNumerico;
-      if (moedaExibicao === "USD" && cotacoes.usd > 0)
+      if (moedaExibicao === "USD" && cotacoes.usd > 0) {
         valorParaSalvar = valorNumerico * cotacoes.usd;
-      if (moedaExibicao === "EUR" && cotacoes.eur > 0)
+      }
+      if (moedaExibicao === "EUR" && cotacoes.eur > 0) {
         valorParaSalvar = valorNumerico * cotacoes.eur;
+      }
 
       const dataSeguraParaBanco = new Date().toISOString().split("T")[0];
+      const isCard = formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX";
 
       setIsLoading(true);
       await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/transactions",
         {
-          description:
-            novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
+          description: novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
           amount: valorParaSalvar,
           transactionDate: dataSeguraParaBanco,
           type: tipoTransacaoSelecionado,
           category: categoriaSelecionada,
-          cardId: cartaoSelecionadoId ? Number(cartaoSelecionadoId) : null,
+          cardId: isCard ? Number(formaPagamento) : null,
+          paymentMethod: isCard ? "CARD" : formaPagamento, // MANDANDO PRO BACKEND (PIX ou ACCOUNT)
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setNovaDescricao("");
       setNovoValor("");
-      setCartaoSelecionadoId("");
+      setFormaPagamento("PIX");
       await buscarTudo();
       await buscarCartoes();
       showToast("Transação registrada com sucesso!", "success");
@@ -526,9 +527,7 @@ export function Dashboard() {
       setIsLoading(true);
       await axios.delete(
         `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       await buscarTudo();
       await buscarCartoes();
@@ -545,53 +544,62 @@ export function Dashboard() {
     if (mesFiltro === 1) {
       setMesFiltro(12);
       setAnoFiltro(anoFiltro - 1);
-    } else setMesFiltro(mesFiltro - 1);
+    } else {
+      setMesFiltro(mesFiltro - 1);
+    }
   };
+
   const handleMesSeguinte = () => {
     if (mesFiltro === 12) {
       setMesFiltro(1);
       setAnoFiltro(anoFiltro + 1);
-    } else setMesFiltro(mesFiltro + 1);
+    } else {
+      setMesFiltro(mesFiltro + 1);
+    }
   };
 
   const transacoesFiltradas = transacoes.filter((t) => {
     if (!t.transactionDate) return false;
     const [anoStr, mesStr] = t.transactionDate.split("-");
-    return (
-      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
-    );
+    return parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro;
   });
 
   const totalEntradasMes = transacoesFiltradas
     .filter((t) => t.type === "INCOME" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    
   const totalSaidasMes = transacoesFiltradas
     .filter((t) => t.type === "EXPENSE" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    
   const saldoMes = totalEntradasMes - totalSaidasMes;
 
-  const transacoesAgrupadas = transacoesFiltradas.reduce(
-    (grupos, transacao) => {
-      const isCard = !!transacao.card;
-      const key = isCard ? `card-${transacao.card?.id}` : "account";
-      const label = isCard
-        ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})`
-        : `🏦 ${t.accountBalance}`;
+  const transacoesAgrupadas = transacoesFiltradas.reduce((grupos, transacao) => {
+    const isCard = !!transacao.card;
+    const isPix = transacao.paymentMethod === "PIX";
+    
+    // Agrupa inteligente na aba de Extrato (Statement)
+    const key = isCard ? `card-${transacao.card?.id}` : isPix ? "pix" : "account";
+    const label = isCard
+      ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})`
+      : isPix 
+        ? `⚡ Pix` 
+        : `🏦 ${t.transferLabel || "Transferência"}`;
 
-      if (!grupos[key]) {
-        grupos[key] = {
-          label,
-          items: [],
-          color: isCard
-            ? transacao.card?.color || transacao.card?.cor || theme.textMain
-            : theme.green,
-        };
-      }
-      grupos[key].items.push(transacao);
-      return grupos;
-    },
-    {} as Record<string, { label: string; items: Transacao[]; color: string }>,
-  );
+    if (!grupos[key]) {
+      grupos[key] = {
+        label,
+        items: [],
+        color: isCard
+          ? transacao.card?.color || transacao.card?.cor || theme.textMain
+          : isPix 
+            ? "#32bcad" 
+            : "#0277bd",
+      };
+    }
+    grupos[key].items.push(transacao);
+    return grupos;
+  }, {} as Record<string, { label: string; items: Transacao[]; color: string }>);
 
   const buscarCartoes = async () => {
     const token = localStorage.getItem("token");
@@ -599,7 +607,7 @@ export function Dashboard() {
     try {
       const resposta = await axios.get(
         "https://swiss-project-api.onrender.com/api/v1/cards",
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setCartoes(resposta.data);
     } catch (erro) {
@@ -612,10 +620,9 @@ export function Dashboard() {
     const token = localStorage.getItem("token");
     try {
       setIsLoading(true);
-      await axios.delete(
-        `https://swiss-project-api.onrender.com/api/v1/cards/${id}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      await axios.delete(`https://swiss-project-api.onrender.com/api/v1/cards/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       await buscarCartoes();
       showToast("Cartão excluído com sucesso!", "success");
     } catch (erro) {
@@ -630,7 +637,7 @@ export function Dashboard() {
     e.preventDefault();
     if (!novoCartaoNome || !novoCartaoFinal || !novoCartaoLimite) return;
     const limiteNumerico = parseFloat(
-      novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", "."),
+      novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", ".")
     );
     if (isNaN(limiteNumerico)) {
       showToast(t.errorValue, "error");
@@ -649,7 +656,7 @@ export function Dashboard() {
           totalLimit: limiteNumerico,
           color: novoCartaoCor,
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setIsCardModalOpen(false);
       setNovoCartaoNome("");
@@ -666,15 +673,42 @@ export function Dashboard() {
     }
   };
 
+  // ==========================================
+  // FUNÇÕES DE EXIBIÇÃO
+  // ==========================================
   const getCategoriasDisponiveis = () => {
     const catKeys =
       tipoTransacaoSelecionado === "INCOME"
         ? ["SALARY", "SALES"]
         : ["BILLS", "ENTERTAINMENT", "FOOD", "MARKET", "TRANSPORT"];
+    
     catKeys.sort((a, b) =>
-      categoryMap[a][idioma].localeCompare(categoryMap[b][idioma]),
+      categoryMap[a][idioma].localeCompare(categoryMap[b][idioma])
     );
     return [...catKeys, "OTHER"];
+  };
+
+  // Função que retorna a lista de formas de pagamento em Ordem Alfabética (A-Z)
+  const getPaymentOptions = () => {
+    const options: Array<{ type: "PIX" | "ACCOUNT" | "CARD"; id: string; label: string; card?: Cartao }> = [];
+    
+    options.push({ type: "PIX", id: "PIX", label: "Pix" });
+    options.push({ type: "ACCOUNT", id: "ACCOUNT", label: t.transferLabel || "Transferência" });
+
+    if (tipoTransacaoSelecionado === "EXPENSE") {
+      cartoes.forEach((c) => {
+        options.push({
+          type: "CARD",
+          id: String(c.id),
+          label: c.nome || c.name || "",
+          card: c,
+        });
+      });
+    }
+
+    // Ordenação Alfabética considerando o idioma
+    options.sort((a, b) => a.label.localeCompare(b.label, idioma));
+    return options;
   };
 
   const getValorExibicao = (valorBaseReal: number) => {
@@ -726,7 +760,7 @@ export function Dashboard() {
       ko: "ko-KR",
     };
     return new Date(
-      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])),
+      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]))
     ).toLocaleDateString(mapaLocais[idioma], {
       timeZone: "UTC",
       day: "2-digit",
@@ -734,6 +768,9 @@ export function Dashboard() {
       year: "numeric",
     });
   };
+
+  const cartaoSelecionado = cartoes.find((c) => String(c.id) === formaPagamento);
+  const opcoesPagamento = getPaymentOptions();
 
   const AppLogo = ({ size = 45 }: { size?: number }) => (
     <div
@@ -754,7 +791,6 @@ export function Dashboard() {
         alt="Logo"
         style={{
           height: "100%",
-
           width: "100%",
           objectFit: "cover",
           transform: "scale(1.3)",
@@ -763,15 +799,7 @@ export function Dashboard() {
     </div>
   );
 
-  const SidebarItem = ({
-    id,
-    icon,
-    label,
-  }: {
-    id: AbaType;
-    icon: string;
-    label: string;
-  }) => {
+  const SidebarItem = ({ id, icon, label }: { id: AbaType; icon: string; label: string }) => {
     const isAtivo = abaAtiva === id;
     return (
       <li
@@ -785,15 +813,12 @@ export function Dashboard() {
           cursor: "pointer",
           fontWeight: isAtivo ? "bold" : "normal",
           color: isAtivo ? (isDarkMode ? "#f5f5f5" : theme.red) : theme.textSec,
-          borderLeft: isAtivo
-            ? `4px solid ${theme.red}`
-            : "4px solid transparent",
+          borderLeft: isAtivo ? `4px solid ${theme.red}` : "4px solid transparent",
           backgroundColor: isAtivo ? theme.highlightBg : "transparent",
           transition: "all 0.2s ease-in-out",
         }}
         onMouseEnter={(e) => {
-          if (!isAtivo)
-            e.currentTarget.style.backgroundColor = theme.sidebarHover;
+          if (!isAtivo) e.currentTarget.style.backgroundColor = theme.sidebarHover;
         }}
         onMouseLeave={(e) => {
           if (!isAtivo) e.currentTarget.style.backgroundColor = "transparent";
@@ -804,14 +829,11 @@ export function Dashboard() {
     );
   };
 
-  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
-    (a, b) => t.langs[a].localeCompare(t.langs[b]),
+  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort((a, b) =>
+    t.langs[a].localeCompare(t.langs[b])
   );
-  const catSelecionadaData =
-    categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
-  const cartaoSelecionado = cartoes.find(
-    (c) => String(c.id) === cartaoSelecionadoId,
-  );
+  
+  const catSelecionadaData = categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
 
   // ==========================================
   // RENDERIZAÇÃO PRINCIPAL (JSX)
@@ -865,9 +887,7 @@ export function Dashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: isDarkMode
-              ? "rgba(0,0,0,0.8)"
-              : "rgba(255,255,255,0.8)",
+            backgroundColor: isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)",
             zIndex: 9999,
             display: "flex",
             flexDirection: "column",
@@ -972,7 +992,7 @@ export function Dashboard() {
         </ul>
       </div>
 
-      {/* HEADER (CABEÇALHO) LIMPO E ADAPTADO */}
+      {/* HEADER (CABEÇALHO) */}
       <header
         style={{
           backgroundColor: "#d91616",
@@ -1120,9 +1140,7 @@ export function Dashboard() {
                       onClick={() => setMoedaExibicao(moeda)}
                       style={{
                         background:
-                          moedaExibicao === moeda
-                            ? theme.highlightBg
-                            : "transparent",
+                          moedaExibicao === moeda ? theme.highlightBg : "transparent",
                         border: "none",
                         padding: "4px 10px",
                         borderRadius: "6px",
@@ -1237,6 +1255,7 @@ export function Dashboard() {
               )}
             </div>
 
+            {/* Formulário de Transação */}
             <div
               style={{
                 marginTop: "1.5rem",
@@ -1288,12 +1307,8 @@ export function Dashboard() {
                         style={{
                           background: isSelected
                             ? isExpense
-                              ? isDarkMode
-                                ? "#4a1c1c"
-                                : "#ffebee"
-                              : isDarkMode
-                                ? "#1b3320"
-                                : "#e8f5e9"
+                              ? isDarkMode ? "#4a1c1c" : "#ffebee"
+                              : isDarkMode ? "#1b3320" : "#e8f5e9"
                             : "transparent",
                           border: "none",
                           padding: "8px 25px",
@@ -1306,9 +1321,7 @@ export function Dashboard() {
                               ? theme.red
                               : theme.green
                             : theme.textMuted,
-                          boxShadow: isSelected
-                            ? "0 2px 5px rgba(0,0,0,0.2)"
-                            : "none",
+                          boxShadow: isSelected ? "0 2px 5px rgba(0,0,0,0.2)" : "none",
                           transition: "all 0.2s",
                         }}
                       >
@@ -1339,9 +1352,7 @@ export function Dashboard() {
                       {t.selCategory}
                     </p>
                     <div
-                      onClick={() =>
-                        setMenuCategoriaAberto(!menuCategoriaAberto)
-                      }
+                      onClick={() => setMenuCategoriaAberto(!menuCategoriaAberto)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -1378,9 +1389,7 @@ export function Dashboard() {
                         style={{
                           fontSize: "0.7rem",
                           color: theme.textMuted,
-                          transform: menuCategoriaAberto
-                            ? "rotate(180deg)"
-                            : "none",
+                          transform: menuCategoriaAberto ? "rotate(180deg)" : "none",
                           transition: "transform 0.2s",
                         }}
                       >
@@ -1419,139 +1428,139 @@ export function Dashboard() {
                     )}
                   </div>
 
-                  {tipoTransacaoSelecionado === "EXPENSE" ? (
-                    <div ref={menuCartaoRef} style={{ position: "relative" }}>
-                      <p
-                        style={{
-                          margin: "0 0 6px 0",
-                          fontSize: "0.75rem",
-                          color: theme.textMuted,
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                        }}
-                      >
-                        {t.paymentHistoryLabel || "Forma de Pagamento"}
-                      </p>
+                  <div ref={menuCartaoRef} style={{ position: "relative" }}>
+                    <p
+                      style={{
+                        margin: "0 0 6px 0",
+                        fontSize: "0.75rem",
+                        color: theme.textMuted,
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      {tipoTransacaoSelecionado === "EXPENSE" 
+                        ? (t.paymentHistoryLabel || "Forma de Pagamento") 
+                        : (t.receiptMethodLabel || "Forma de Recebimento")}
+                    </p>
+                    <div
+                      onClick={() => {
+                        setMenuCartaoAberto(!menuCartaoAberto);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg,
+                        cursor: "pointer",
+                        transition: "border-color 0.2s",
+                      }}
+                    >
                       <div
-                        onClick={() => {
-                          setMenuCartaoAberto(!menuCartaoAberto);
-                        }}
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "10px 14px",
-                          borderRadius: "10px",
-                          border: `1px solid ${theme.border}`,
-                          backgroundColor: theme.inputBg,
-                          cursor: "pointer",
-                          transition: "border-color 0.2s",
+                          gap: "8px",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          {cartaoSelecionado ? (
-                            <>
-                              <span
-                                style={{
-                                  fontSize: "1.1rem",
-                                  color:
-                                    cartaoSelecionado.color ||
-                                    cartaoSelecionado.cor ||
-                                    "#8A05BE",
-                                }}
-                              >
-                                💳
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "0.9rem",
-                                  color: theme.textMain,
-                                  fontWeight: "500",
-                                }}
-                              >
-                                {cartaoSelecionado.nome ||
-                                  cartaoSelecionado.name}{" "}
-                                ({cartaoSelecionado.lastDigits})
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span style={{ fontSize: "1.1rem" }}>🏦</span>
-                              <span
-                                style={{
-                                  fontSize: "0.9rem",
-                                  color: theme.textMain,
-                                  fontWeight: "500",
-                                }}
-                              >
-                                {t.accountBalance}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "0.7rem",
-                            color: theme.textMuted,
-                            transform: menuCartaoAberto
-                              ? "rotate(180deg)"
-                              : "none",
-                            transition: "transform 0.2s",
-                          }}
-                        >
-                          ▼
-                        </span>
+                        {formaPagamento === "PIX" ? (
+                          <>
+                            <span style={{ fontSize: "1.1rem" }}>⚡</span>
+                            <span
+                              style={{
+                                fontSize: "0.9rem",
+                                color: theme.textMain,
+                                fontWeight: "500",
+                              }}
+                            >
+                              Pix
+                            </span>
+                          </>
+                        ) : formaPagamento === "ACCOUNT" ? (
+                          <>
+                            <span style={{ fontSize: "1.1rem" }}>🏦</span>
+                            <span
+                              style={{
+                                fontSize: "0.9rem",
+                                color: theme.textMain,
+                                fontWeight: "500",
+                              }}
+                            >
+                              {t.transferLabel || "Transferência"}
+                            </span>
+                          </>
+                        ) : cartaoSelecionado ? (
+                          <>
+                            <span
+                              style={{
+                                fontSize: "1.1rem",
+                                color:
+                                  cartaoSelecionado.color ||
+                                  cartaoSelecionado.cor ||
+                                  "#8A05BE",
+                              }}
+                            >
+                              💳
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.9rem",
+                                color: theme.textMain,
+                                fontWeight: "500",
+                              }}
+                            >
+                              {cartaoSelecionado.nome || cartaoSelecionado.name} (
+                              {cartaoSelecionado.lastDigits})
+                            </span>
+                          </>
+                        ) : null}
                       </div>
-                      {menuCartaoAberto && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "calc(100% + 5px)",
-                            left: 0,
-                            width: "100%",
-                            backgroundColor: theme.bgCard,
-                            borderRadius: "12px",
-                            boxShadow: theme.shadow,
-                            padding: "6px",
-                            zIndex: 1002,
-                            border: `1px solid ${theme.border}`,
-                          }}
-                        >
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          color: theme.textMuted,
+                          transform: menuCartaoAberto ? "rotate(180deg)" : "none",
+                          transition: "transform 0.2s",
+                        }}
+                      >
+                        ▼
+                      </span>
+                    </div>
+                    {menuCartaoAberto && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 5px)",
+                          left: 0,
+                          width: "100%",
+                          backgroundColor: theme.bgCard,
+                          borderRadius: "12px",
+                          boxShadow: theme.shadow,
+                          padding: "6px",
+                          zIndex: 1002,
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      >
+                        {opcoesPagamento.map((opt) => (
                           <PaymentMethodOption
-                            t={t}
+                            key={opt.id}
+                            tipo={opt.type}
+                            card={opt.card}
+                            label={opt.label}
                             theme={theme}
                             onSelect={() => {
-                              setCartaoSelecionadoId("");
+                              setFormaPagamento(opt.id);
                               setMenuCartaoAberto(false);
                             }}
-                            isSelected={cartaoSelecionadoId === ""}
+                            isSelected={formaPagamento === opt.id}
                           />
-                          {cartoes.map((c) => (
-                            <PaymentMethodOption
-                              key={c.id}
-                              card={c}
-                              t={t}
-                              theme={theme}
-                              onSelect={() => {
-                                setCartaoSelecionadoId(String(c.id));
-                                setMenuCartaoAberto(false);
-                              }}
-                              isSelected={cartaoSelecionadoId === String(c.id)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ display: isMobile ? "none" : "block" }}></div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div
@@ -1652,7 +1661,7 @@ export function Dashboard() {
               </form>
             </div>
 
-            {/* Histórico Geral */}
+            {/* Histórico Filtrado na Home */}
             <div
               style={{
                 marginTop: "1.5rem",
@@ -1675,130 +1684,154 @@ export function Dashboard() {
               </h3>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <tbody>
-                  {transacoes.map((t_row, i) => {
-                    const isExpense = t_row.type === "EXPENSE";
-                    const infoExibicao = getValorExibicao(
-                      Math.abs(t_row.amount || 0),
-                    );
-                    const categoriaVisual =
-                      categoryMap[t_row.category || "OTHER"] ||
-                      categoryMap["OTHER"];
-                    const isOutros =
-                      !t_row.category || t_row.category === "OTHER";
-                    const corDeFundoIcone = isOutros
-                      ? isExpense
-                        ? isDarkMode
-                          ? "#4a1c1c"
-                          : "#ffebee"
-                        : isDarkMode
-                          ? "#1b3320"
-                          : "#e8f5e9"
-                      : categoriaVisual.bgColor;
+                  {transacoes
+                    .filter((t_row) => t_row.type === tipoTransacaoSelecionado)
+                    .map((t_row, i) => {
+                      const isExpense = t_row.type === "EXPENSE";
+                      const infoExibicao = getValorExibicao(Math.abs(t_row.amount || 0));
+                      const categoriaVisual =
+                        categoryMap[t_row.category || "OTHER"] || categoryMap["OTHER"];
+                      const isOutros = !t_row.category || t_row.category === "OTHER";
+                      const corDeFundoIcone = isOutros
+                        ? isExpense
+                          ? isDarkMode ? "#4a1c1c" : "#ffebee"
+                          : isDarkMode ? "#1b3320" : "#e8f5e9"
+                        : categoriaVisual.bgColor;
 
-                    return (
-                      <tr
-                        key={t_row.id || i}
-                        style={{ borderBottom: `1px solid ${theme.border}` }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 0",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "15px",
-                          }}
+                      return (
+                        <tr
+                          key={t_row.id || i}
+                          style={{ borderBottom: `1px solid ${theme.border}` }}
                         >
-                          <div
+                          <td
                             style={{
-                              width: "40px",
-                              height: "40px",
-                              borderRadius: "10px",
-                              backgroundColor: corDeFundoIcone,
+                              padding: "14px 0",
                               display: "flex",
-                              justifyContent: "center",
                               alignItems: "center",
-                              fontSize: "1.2rem",
+                              gap: "15px",
                             }}
-                            title={categoriaVisual[idioma]}
                           >
-                            {categoriaVisual.emoji}
-                          </div>
-                          <div>
                             <div
                               style={{
-                                fontWeight: "500",
-                                color: theme.textMain,
+                                width: "40px",
+                                height: "40px",
+                                borderRadius: "10px",
+                                backgroundColor: corDeFundoIcone,
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                fontSize: "1.2rem",
+                              }}
+                              title={categoriaVisual[idioma]}
+                            >
+                              {categoriaVisual.emoji}
+                            </div>
+                            <div>
+                              <div
+                                style={{
+                                  fontWeight: "500",
+                                  color: theme.textMain,
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {t_row.description}
+                              </div>
+                              <div
+                                style={{
+                                  color: theme.textMuted,
+                                  fontSize: "0.75rem",
+                                  marginTop: "4px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    color: isExpense ? theme.red : theme.green,
+                                    fontWeight: "bold",
+                                    marginRight: "6px",
+                                  }}
+                                >
+                                  {categoriaVisual[idioma]}
+                                </span>
+                                • {formatarDataLocal(t_row.transactionDate)}
+                                
+                                {/* Lógica Visual: Pix vs Transferência vs Cartão */}
+                                {t_row.card ? (
+                                  <span
+                                    style={{
+                                      marginLeft: "6px",
+                                      color: t_row.card.color || t_row.card.cor || theme.textMuted,
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    • 💳 {t_row.card.name || t_row.card.nome}
+                                  </span>
+                                ) : t_row.paymentMethod === "PIX" ? (
+                                  <span
+                                    style={{
+                                      marginLeft: "6px",
+                                      color: "#32bcad",
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    • ⚡ Pix
+                                  </span>
+                                ) : t_row.paymentMethod === "ACCOUNT" ? (
+                                  <span
+                                    style={{
+                                      marginLeft: "6px",
+                                      color: "#0277bd",
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    • 🏦 {t.transferLabel || "Transferência"}
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      marginLeft: "6px",
+                                      color: theme.textMuted,
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    • 🏦 {t.transferLabel || "Transferência"} / ⚡ Pix
+                                  </span>
+                                )}
+
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: "14px 0", textAlign: "right" }}>
+                            <div
+                              style={{
+                                fontWeight: "600",
+                                color: isExpense ? theme.red : theme.green,
                                 fontSize: "0.95rem",
                               }}
                             >
-                              {t_row.description}
+                              {isExpense ? "- " : "+ "} {infoExibicao.simbolo}{" "}
+                              {infoExibicao.valorFormatado}
                             </div>
-                            <div
+                          </td>
+                          <td style={{ width: "40px", textAlign: "right" }}>
+                            <button
+                              onClick={() => handleDeleteTransaction(t_row.id)}
                               style={{
+                                background: "none",
+                                border: "none",
                                 color: theme.textMuted,
-                                fontSize: "0.75rem",
-                                marginTop: "4px",
+                                cursor: "pointer",
+                                fontSize: "1.2rem",
                               }}
                             >
-                              <span
-                                style={{
-                                  color: isExpense ? theme.red : theme.green,
-                                  fontWeight: "bold",
-                                  marginRight: "6px",
-                                }}
-                              >
-                                {categoriaVisual[idioma]}
-                              </span>
-                              • {formatarDataLocal(t_row.transactionDate)}
-                              {t_row.card && (
-                                <span
-                                  style={{
-                                    marginLeft: "6px",
-                                    color:
-                                      t_row.card.color ||
-                                      t_row.card.cor ||
-                                      theme.textMuted,
-                                    fontWeight: "600",
-                                  }}
-                                >
-                                  • 💳 {t_row.card.name || t_row.card.nome}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 0", textAlign: "right" }}>
-                          <div
-                            style={{
-                              fontWeight: "600",
-                              color: isExpense ? theme.red : theme.green,
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {isExpense ? "- " : "+ "} {infoExibicao.simbolo}{" "}
-                            {infoExibicao.valorFormatado}
-                          </div>
-                        </td>
-                        <td style={{ width: "40px", textAlign: "right" }}>
-                          <button
-                            onClick={() => handleDeleteTransaction(t_row.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: theme.textMuted,
-                              cursor: "pointer",
-                              fontSize: "1.2rem",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
-              {transacoes.length === 0 && (
+              {transacoes.filter((t_row) => t_row.type === tipoTransacaoSelecionado).length === 0 && (
                 <p
                   style={{
                     textAlign: "center",
@@ -1816,9 +1849,7 @@ export function Dashboard() {
 
         {/* ================= ABA 2: EXTRATO DETALHADO ================= */}
         {abaAtiva === "statement" && (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -1833,9 +1864,7 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              <h2
-                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
-              >
+              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
                 📊 {t.statement}
               </h2>
               <div
@@ -1949,7 +1978,7 @@ export function Dashboard() {
                           gap: "8px",
                         }}
                       >
-                        {t.months.map((monthName, index) => {
+                        {t.months.map((monthName: string, index: number) => {
                           const isSelected =
                             mesFiltro === index + 1 && anoFiltro === pickerYear;
                           return (
@@ -2166,22 +2195,14 @@ export function Dashboard() {
                     <tbody>
                       {grupo.items.map((t_row, i) => {
                         const isExpense = t_row.type === "EXPENSE";
-                        const infoExibicao = getValorExibicao(
-                          Math.abs(t_row.amount || 0),
-                        );
+                        const infoExibicao = getValorExibicao(Math.abs(t_row.amount || 0));
                         const categoriaVisual =
-                          categoryMap[t_row.category || "OTHER"] ||
-                          categoryMap["OTHER"];
-                        const isOutros =
-                          !t_row.category || t_row.category === "OTHER";
+                          categoryMap[t_row.category || "OTHER"] || categoryMap["OTHER"];
+                        const isOutros = !t_row.category || t_row.category === "OTHER";
                         const corDeFundoIcone = isOutros
                           ? isExpense
-                            ? isDarkMode
-                              ? "#4a1c1c"
-                              : "#ffebee"
-                            : isDarkMode
-                              ? "#1b3320"
-                              : "#e8f5e9"
+                            ? isDarkMode ? "#4a1c1c" : "#ffebee"
+                            : isDarkMode ? "#1b3320" : "#e8f5e9"
                           : categoriaVisual.bgColor;
 
                         return (
@@ -2233,9 +2254,7 @@ export function Dashboard() {
                                 >
                                   <span
                                     style={{
-                                      color: isExpense
-                                        ? theme.red
-                                        : theme.green,
+                                      color: isExpense ? theme.red : theme.green,
                                       fontWeight: "bold",
                                       marginRight: "6px",
                                     }}
@@ -2243,6 +2262,50 @@ export function Dashboard() {
                                     {categoriaVisual[idioma]}
                                   </span>
                                   • {formatarDataLocal(t_row.transactionDate)}
+                                  
+                                  {/* Lógica Visual do Extrato: Pix vs Transferência vs Cartão */}
+                                  {t_row.card ? (
+                                    <span
+                                      style={{
+                                        marginLeft: "6px",
+                                        color: t_row.card.color || t_row.card.cor || theme.textMuted,
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 💳 {t_row.card.name || t_row.card.nome}
+                                    </span>
+                                  ) : t_row.paymentMethod === "PIX" ? (
+                                    <span
+                                      style={{
+                                        marginLeft: "6px",
+                                        color: "#32bcad",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • ⚡ Pix
+                                    </span>
+                                  ) : t_row.paymentMethod === "ACCOUNT" ? (
+                                    <span
+                                      style={{
+                                        marginLeft: "6px",
+                                        color: "#0277bd",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 🏦 {t.transferLabel || "Transferência"}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        marginLeft: "6px",
+                                        color: theme.textMuted,
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 🏦 {t.transferLabel || "Transferência"} / ⚡ Pix
+                                    </span>
+                                  )}
+
                                 </div>
                               </div>
                             </td>
@@ -2257,15 +2320,12 @@ export function Dashboard() {
                                 }}
                               >
                                 {isExpense ? "- " : "+ "}
-                                {infoExibicao.simbolo}{" "}
-                                {infoExibicao.valorFormatado}
+                                {infoExibicao.simbolo} {infoExibicao.valorFormatado}
                               </div>
                             </td>
                             <td style={{ width: "40px", textAlign: "right" }}>
                               <button
-                                onClick={() =>
-                                  handleDeleteTransaction(t_row.id)
-                                }
+                                onClick={() => handleDeleteTransaction(t_row.id)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -2327,9 +2387,7 @@ export function Dashboard() {
                 boxSizing: "border-box",
               }}
             >
-              <h2
-                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
-              >
+              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
                 💳 {t.cards}
               </h2>
               <button
@@ -2523,9 +2581,7 @@ export function Dashboard() {
                       </p>
                       <p style={{ margin: 0, fontSize: "0.9rem" }}>
                         R${" "}
-                        {(
-                          cartao.totalLimit - (cartao.currentInvoice || 0)
-                        ).toLocaleString("pt-BR", {
+                        {(cartao.totalLimit - (cartao.currentInvoice || 0)).toLocaleString("pt-BR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -2567,9 +2623,7 @@ export function Dashboard() {
 
         {/* ================= ABA 4: CONFIGURAÇÕES ================= */}
         {abaAtiva === "settings" && (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -2582,9 +2636,7 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              <h2
-                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
-              >
+              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
                 ⚙️ {t.settings}
               </h2>
             </div>
@@ -2728,7 +2780,7 @@ export function Dashboard() {
                 </p>
               </div>
 
-              {/* NOVO CARTÃO: IDIOMA */}
+              {/* CARTÃO 2: IDIOMA */}
               <div
                 style={{
                   backgroundColor: theme.bgCard,
@@ -2758,7 +2810,9 @@ export function Dashboard() {
                       style={{
                         background:
                           idioma === lang ? theme.highlightBg : theme.inputBg,
-                        border: `1px solid ${idioma === lang ? theme.red : theme.border}`,
+                        border: `1px solid ${
+                          idioma === lang ? theme.red : theme.border
+                        }`,
                         padding: "10px 15px",
                         borderRadius: "10px",
                         cursor: "pointer",
@@ -2789,7 +2843,7 @@ export function Dashboard() {
                 </p>
               </div>
 
-              {/* CARTÃO 2: APARÊNCIA */}
+              {/* CARTÃO 3: APARÊNCIA */}
               <div
                 style={{
                   backgroundColor: theme.bgCard,
@@ -2829,9 +2883,7 @@ export function Dashboard() {
                     >
                       {t.darkModeLabel || "Modo Escuro (Dark Mode)"}
                     </strong>
-                    <span
-                      style={{ fontSize: "0.8rem", color: theme.textMuted }}
-                    >
+                    <span style={{ fontSize: "0.8rem", color: theme.textMuted }}>
                       {t.darkModeDesc || "Altera o tema visual do aplicativo."}
                     </span>
                   </div>
@@ -2868,7 +2920,7 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* CARTÃO 3: SEGURANÇA */}
+              {/* CARTÃO 4: SEGURANÇA */}
               <div
                 style={{
                   backgroundColor: theme.bgCard,
@@ -2915,7 +2967,6 @@ export function Dashboard() {
                       type="password"
                       value={senhaAtual}
                       onChange={(e) => setSenhaAtual(e.target.value)}
-                      placeholder=""
                       required
                       style={{
                         width: "100%",
@@ -2954,7 +3005,6 @@ export function Dashboard() {
                         type="password"
                         value={novaSenha}
                         onChange={(e) => setNovaSenha(e.target.value)}
-                        placeholder=""
                         required
                         style={{
                           width: "100%",
@@ -2986,7 +3036,6 @@ export function Dashboard() {
                         type="password"
                         value={confirmarNovaSenha}
                         onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                        placeholder=""
                         required
                         style={{
                           width: "100%",
@@ -3153,8 +3202,7 @@ export function Dashboard() {
                           novoCartaoCor === cor
                             ? "3px solid #ccc"
                             : "2px solid transparent",
-                        transform:
-                          novoCartaoCor === cor ? "scale(1.1)" : "none",
+                        transform: novoCartaoCor === cor ? "scale(1.1)" : "none",
                         transition: "all 0.2s",
                       }}
                     />
@@ -3265,6 +3313,8 @@ const translations = {
     descriptionLabel: "Descrição",
     valueLabel: "Valor",
     paymentHistoryLabel: "Forma de Pagamento",
+    receiptMethodLabel: "Forma de Recebimento",
+    transferLabel: "Transferência",
     profileTitle: "Meu Perfil",
     fullNameLabel: "Nome Completo",
     emailLabel: "E-mail",
@@ -3355,6 +3405,8 @@ const translations = {
     descriptionLabel: "Description",
     valueLabel: "Value",
     paymentHistoryLabel: "Payment Method",
+    receiptMethodLabel: "Receipt Method",
+    transferLabel: "Bank Transfer",
     profileTitle: "My Profile",
     fullNameLabel: "Full Name",
     emailLabel: "E-mail",
@@ -3446,6 +3498,8 @@ const translations = {
     descriptionLabel: "Descripción",
     valueLabel: "Valor",
     paymentHistoryLabel: "Método de Pago",
+    receiptMethodLabel: "Forma de Cobro",
+    transferLabel: "Transferencia",
     profileTitle: "Mi Perfil",
     fullNameLabel: "Nombre Completo",
     emailLabel: "Correo",
@@ -3536,6 +3590,8 @@ const translations = {
     descriptionLabel: "Description",
     valueLabel: "Valeur",
     paymentHistoryLabel: "Méthode de Paiement",
+    receiptMethodLabel: "Méthode d'Encaissement",
+    transferLabel: "Virement",
     profileTitle: "Mon Profil",
     fullNameLabel: "Nom Complet",
     emailLabel: "E-mail",
@@ -3627,6 +3683,8 @@ const translations = {
     descriptionLabel: "Beschreibung",
     valueLabel: "Wert",
     paymentHistoryLabel: "Zahlungsmethode",
+    receiptMethodLabel: "Empfangsmethode",
+    transferLabel: "Überweisung",
     profileTitle: "Mein Profil",
     fullNameLabel: "Vollständiger Name",
     emailLabel: "E-Mail",
@@ -3718,6 +3776,8 @@ const translations = {
     descriptionLabel: "Descrizione",
     valueLabel: "Valore",
     paymentHistoryLabel: "Metodo di Pagamento",
+    receiptMethodLabel: "Metodo di Ricezione",
+    transferLabel: "Bonifico",
     profileTitle: "Il Mio Profilo",
     fullNameLabel: "Nome Completo",
     emailLabel: "E-mail",
@@ -3809,6 +3869,8 @@ const translations = {
     descriptionLabel: "説明",
     valueLabel: "価値",
     paymentHistoryLabel: "支払方法",
+    receiptMethodLabel: "受取方法",
+    transferLabel: "振込",
     profileTitle: "マイプロフィール",
     fullNameLabel: "フルネーム",
     emailLabel: "メール",
@@ -3899,6 +3961,8 @@ const translations = {
     descriptionLabel: "描述",
     valueLabel: "价值",
     paymentHistoryLabel: "支付方式",
+    receiptMethodLabel: "收款方式",
+    transferLabel: "转账",
     profileTitle: "我的资料",
     fullNameLabel: "全名",
     emailLabel: "电子邮件",
@@ -3987,6 +4051,8 @@ const translations = {
     descriptionLabel: "설명",
     valueLabel: "가치",
     paymentHistoryLabel: "결제 방법",
+    receiptMethodLabel: "수취 방법",
+    transferLabel: "계좌 이체",
     profileTitle: "내 프로필",
     fullNameLabel: "성명",
     emailLabel: "이메일",
@@ -4121,7 +4187,7 @@ const categoryMap: Record<
     it: "Svago",
     ja: "娯楽",
     zh: "娱乐",
-    ko: "オ락",
+    ko: "오락",
     emoji: "🍿",
     color: "#6a1b9a",
     bgColor: "#f3e5f5",
