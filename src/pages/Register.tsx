@@ -4,7 +4,7 @@ import axios from "axios";
 
 import bgImg from "../assets/loginbackground.png";
 
-type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de";
 
 const AppLogo = ({ size = 45 }: { size?: number }) => (
   <div
@@ -85,7 +85,6 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Estados simplificados para a visualização das senhas
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
     useState(false);
@@ -660,10 +659,6 @@ const countryPhoneCodes = [
   { code: "+34", label: "🇪🇸 +34" },
   { code: "+33", label: "🇫🇷 +33" },
   { code: "+49", label: "🇩🇪 +49" },
-  { code: "+39", label: "🇮🇹 +39" },
-  { code: "+81", label: "🇯🇵 +81" },
-  { code: "+86", label: "🇨🇳 +86" },
-  { code: "+82", label: "🇰🇷 +82" },
 ];
 
 const translations = {
@@ -675,10 +670,6 @@ const translations = {
       es: "Espanhol",
       fr: "Francês",
       de: "Alemão",
-      it: "Italiano",
-      ja: "Japonês",
-      zh: "Chinês",
-      ko: "Coreano",
     },
     title: "Criar Conta",
     fullNameLabel: "Nome Completo",
@@ -703,10 +694,6 @@ const translations = {
       es: "Spanish",
       fr: "French",
       de: "German",
-      it: "Italian",
-      ja: "Japanese",
-      zh: "Chinese",
-      ko: "Korean",
     },
     title: "Create Account",
     fullNameLabel: "Full Name",
@@ -731,10 +718,6 @@ const translations = {
       es: "Español",
       fr: "Francés",
       de: "Alemán",
-      it: "Italiano",
-      ja: "Japonés",
-      zh: "Chino",
-      ko: "Coreano",
     },
     title: "Crear Cuenta",
     fullNameLabel: "Nombre Completo",
@@ -759,10 +742,6 @@ const translations = {
       es: "Espagnol",
       fr: "Français",
       de: "Allemand",
-      it: "Italien",
-      ja: "Japonais",
-      zh: "Chinois",
-      ko: "Coréen",
     },
     title: "Créer un Compte",
     fullNameLabel: "Nom Complet",
@@ -788,10 +767,6 @@ const translations = {
       es: "Spanisch",
       fr: "Französisch",
       de: "Deutsch",
-      it: "Italienisch",
-      ja: "Japanisch",
-      zh: "Chinesisch",
-      ko: "Koreanisch",
     },
     title: "Konto Erstellen",
     fullNameLabel: "Vollständiger Name",
@@ -808,117 +783,5 @@ const translations = {
       "Fehler beim Erstellen. Diese ID oder E-Mail könnte bereits verwendet werden.",
     successMsg:
       "Konto erfolgreich erstellt! Bitte melden Sie sich an, um fortzufahren.",
-  },
-  it: {
-    flag: "🇮🇹",
-    langs: {
-      pt: "Portoghese",
-      en: "Inglese",
-      es: "Spagnolo",
-      fr: "Francese",
-      de: "Tedesco",
-      it: "Italiano",
-      ja: "Giapponese",
-      zh: "Cinese",
-      ko: "Coreano",
-    },
-    title: "Crea Account",
-    fullNameLabel: "Nome Completo",
-    cpfLabel: "Documento / CPF",
-    phoneLabel: "Telefono",
-    emailLabel: "E-mail",
-    passwordLabel: "Password",
-    confirmPasswordLabel: "Conferma",
-    registerBtn: "Iscriviti",
-    hasAccount: "Hai già un account?",
-    loginLink: "Accedi",
-    errorMismatch: "Le password non corrispondono.",
-    errorGeneral:
-      "Errore durante la creazione. Questo ID o e-mail potrebbe essere già in uso.",
-    successMsg: "Account creato con successo! Accedi per continuare.",
-  },
-  ja: {
-    flag: "🇯🇵",
-    langs: {
-      pt: "ポルトガル語",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "韓国語",
-    },
-    title: "アカウント作成",
-    fullNameLabel: "フルネーム",
-    cpfLabel: "身分証明書 / CPF",
-    phoneLabel: "電話番号",
-    emailLabel: "メール",
-    passwordLabel: "パスワード",
-    confirmPasswordLabel: "パスワード確認",
-    registerBtn: "登録",
-    hasAccount: "すでにアカウントをお持ちですか？",
-    loginLink: "ログイン",
-    errorMismatch: "パスワードが一致しません。",
-    errorGeneral:
-      "エラー。このIDまたはメールはすでに使用されている可能性があります。",
-    successMsg:
-      "アカウントが正常に作成されました！続行するにはログインしてください。",
-  },
-  zh: {
-    flag: "🇨🇳",
-    langs: {
-      pt: "葡萄牙语",
-      en: "英语",
-      es: "西班牙语",
-      fr: "法语",
-      de: "德语",
-      it: "意大利语",
-      ja: "日语",
-      zh: "中文",
-      ko: "韩语",
-    },
-    title: "创建账号",
-    fullNameLabel: "全名",
-    cpfLabel: "身份证 / CPF",
-    phoneLabel: "电话号码",
-    emailLabel: "电子邮件",
-    passwordLabel: "密码",
-    confirmPasswordLabel: "确认密码",
-    registerBtn: "注册",
-    hasAccount: "已有账号？",
-    loginLink: "登录",
-    errorMismatch: "密码不匹配。",
-    errorGeneral: "创建账号错误。此ID或电邮可能已被使用。",
-    successMsg: "账号创建成功！请登录以继续。",
-  },
-  ko: {
-    flag: "🇰🇷",
-    langs: {
-      pt: "포르투갈어",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "한국어",
-    },
-    title: "계정 만들기",
-    fullNameLabel: "성명",
-    cpfLabel: "신분증 / CPF",
-    phoneLabel: "전화번호",
-    emailLabel: "이메일",
-    passwordLabel: "비밀번호",
-    confirmPasswordLabel: "비밀번호 확인",
-    registerBtn: "가입하기",
-    hasAccount: "이미 계정이 있으신가요?",
-    loginLink: "로그인",
-    errorMismatch: "비밀번호가 일치하지 않습니다.",
-    errorGeneral:
-      "계정 생성 오류. 이 ID 또는 이메일은 이미 사용 중일 수 있습니다.",
-    successMsg: "계정이 성공적으로 생성되었습니다! 계속하려면 로그인하십시오.",
   },
 };

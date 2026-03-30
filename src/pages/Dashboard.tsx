@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de";
 type AbaType = "home" | "statement" | "cards" | "settings";
 
 interface Transacao {
@@ -13,7 +13,7 @@ interface Transacao {
   type?: string;
   category?: string;
   card?: Cartao;
-  paymentMethod?: string; // NOVO: "PIX", "ACCOUNT" ou "CARD"
+  paymentMethod?: string;
 }
 
 interface Cartao {
@@ -44,9 +44,19 @@ type ThemeType = {
 };
 
 // ==========================================
+// UTILITÁRIOS GLOBAIS
+// ==========================================
+const obterDataAtualLocal = () => {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+};
+
+// ==========================================
 // CUSTOM COMPONENTS
 // ==========================================
-
 const CategoryOption = ({
   catKey,
   idiom,
@@ -105,7 +115,7 @@ const PaymentMethodOption = ({
   isSelected,
   theme,
 }: {
-  tipo: "ACCOUNT" | "PIX" | "CARD";
+  tipo: "ACCOUNT" | "PIX" | "CARD" | "BALANCE";
   card?: Cartao;
   label: string;
   onSelect: () => void;
@@ -151,6 +161,20 @@ const PaymentMethodOption = ({
       {tipo === "ACCOUNT" && (
         <>
           <span style={{ fontSize: "1.1rem" }}>🏦</span>
+          <span
+            style={{
+              fontWeight: isSelected ? "600" : "500",
+              color: isSelected ? theme.textMain : theme.textSec,
+              fontSize: "0.85rem",
+            }}
+          >
+            {label}
+          </span>
+        </>
+      )}
+      {tipo === "BALANCE" && (
+        <>
+          <span style={{ fontSize: "1.1rem" }}>💰</span>
           <span
             style={{
               fontWeight: isSelected ? "600" : "500",
@@ -293,6 +317,7 @@ export function Dashboard() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [novaDescricao, setNovaDescricao] = useState("");
   const [novoValor, setNovoValor] = useState("");
+  const [dataTransacao, setDataTransacao] = useState(obterDataAtualLocal());
   const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<
     "INCOME" | "EXPENSE"
   >("EXPENSE");
@@ -305,12 +330,34 @@ export function Dashboard() {
   const [menuCartaoAberto, setMenuCartaoAberto] = useState(false);
   const menuCartaoRef = useRef<HTMLDivElement>(null);
 
+  const [isDataPickerOpen, setIsDataPickerOpen] = useState(false);
+  const dataPickerRef = useRef<HTMLDivElement>(null);
+  const [pickerInsertMode, setPickerInsertMode] = useState<"month" | "day">(
+    "day",
+  );
+  const [pickerInsertYear, setPickerInsertYear] = useState<number>(
+    new Date().getFullYear(),
+  );
+  const [pickerInsertMonth, setPickerInsertMonth] = useState<number>(
+    new Date().getMonth() + 1,
+  );
+
   const dataAtual = new Date();
   const [mesFiltro, setMesFiltro] = useState<number>(dataAtual.getMonth() + 1);
   const [anoFiltro, setAnoFiltro] = useState<number>(dataAtual.getFullYear());
+  const [diaFiltro, setDiaFiltro] = useState<number | null>(null);
+
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"month" | "day">("month");
   const [pickerYear, setPickerYear] = useState<number>(dataAtual.getFullYear());
   const monthPickerRef = useRef<HTMLDivElement>(null);
+
+  const [expandedStatementGroup, setExpandedStatementGroup] = useState<
+    string | null
+  >(null);
+  const [statementInnerFilter, setStatementInnerFilter] = useState<
+    Record<string, "ALL" | "INCOME" | "EXPENSE">
+  >({});
 
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
@@ -370,6 +417,12 @@ export function Dashboard() {
       ) {
         setIsMonthPickerOpen(false);
       }
+      if (
+        dataPickerRef.current &&
+        !dataPickerRef.current.contains(event.target as Node)
+      ) {
+        setIsDataPickerOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickFora);
     return () => document.removeEventListener("mousedown", handleClickFora);
@@ -383,9 +436,10 @@ export function Dashboard() {
       );
     }
 
-    // Se mudou para entrada, reseta a forma de pagamento para PIX se estiver com cartão selecionado
     if (tipoTransacaoSelecionado === "INCOME") {
-      if (formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX") {
+      if (formaPagamento === "BALANCE") {
+        setFormaPagamento("PIX");
+      } else if (formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX") {
         setFormaPagamento("PIX");
       }
     }
@@ -524,12 +578,10 @@ export function Dashboard() {
         valorParaSalvar = valorNumerico * cotacoes.eur;
       }
 
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
-      const mes = String(hoje.getMonth() + 1).padStart(2, "0");
-      const dia = String(hoje.getDate()).padStart(2, "0");
-      const dataSeguraParaBanco = `${ano}-${mes}-${dia}`;
-      const isCard = formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX";
+      const isCard =
+        formaPagamento !== "ACCOUNT" &&
+        formaPagamento !== "PIX" &&
+        formaPagamento !== "BALANCE";
 
       setIsLoading(true);
       await axios.post(
@@ -538,17 +590,18 @@ export function Dashboard() {
           description:
             novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
           amount: valorParaSalvar,
-          transactionDate: dataSeguraParaBanco,
+          transactionDate: dataTransacao,
           type: tipoTransacaoSelecionado,
           category: categoriaSelecionada,
           cardId: isCard ? Number(formaPagamento) : null,
-          paymentMethod: isCard ? "CARD" : formaPagamento, // MANDANDO PRO BACKEND (PIX ou ACCOUNT)
+          paymentMethod: isCard ? "CARD" : formaPagamento,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setNovaDescricao("");
       setNovoValor("");
       setFormaPagamento("PIX");
+      setDataTransacao(obterDataAtualLocal());
       await buscarTudo();
       await buscarCartoes();
       showToast("Transação registrada com sucesso!", "success");
@@ -582,6 +635,7 @@ export function Dashboard() {
   };
 
   const handleMesAnterior = () => {
+    setDiaFiltro(null);
     if (mesFiltro === 1) {
       setMesFiltro(12);
       setAnoFiltro(anoFiltro - 1);
@@ -591,6 +645,7 @@ export function Dashboard() {
   };
 
   const handleMesSeguinte = () => {
+    setDiaFiltro(null);
     if (mesFiltro === 12) {
       setMesFiltro(1);
       setAnoFiltro(anoFiltro + 1);
@@ -601,10 +656,11 @@ export function Dashboard() {
 
   const transacoesFiltradas = transacoes.filter((t) => {
     if (!t.transactionDate) return false;
-    const [anoStr, mesStr] = t.transactionDate.split("-");
-    return (
-      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
-    );
+    const [anoStr, mesStr, diaStr] = t.transactionDate.split("-");
+    const anoMatch = parseInt(anoStr, 10) === anoFiltro;
+    const mesMatch = parseInt(mesStr, 10) === mesFiltro;
+    const diaMatch = diaFiltro === null || parseInt(diaStr, 10) === diaFiltro;
+    return anoMatch && mesMatch && diaMatch;
   });
 
   const totalEntradasMes = transacoesFiltradas
@@ -617,39 +673,147 @@ export function Dashboard() {
 
   const saldoMes = totalEntradasMes - totalSaidasMes;
 
-  const transacoesAgrupadas = transacoesFiltradas.reduce(
-    (grupos, transacao) => {
-      const isCard = !!transacao.card;
-      const isPix = transacao.paymentMethod === "PIX";
+  // ==========================================
+  // LÓGICA DE ORDENAÇÃO DE FORMAS DE PAGAMENTO
+  // ==========================================
+  const getPaymentOptions = () => {
+    // 1. Array só de Cartões (para colocar em ordem alfabética)
+    const cardOptions: Array<{
+      type: "CARD";
+      id: string;
+      label: string;
+      card?: Cartao;
+    }> = [];
 
-      // Agrupa inteligente na aba de Extrato (Statement)
-      const key = isCard
-        ? `card-${transacao.card?.id}`
-        : isPix
-          ? "pix"
-          : "account";
-      const label = isCard
-        ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})`
-        : isPix
-          ? `⚡ Pix`
-          : `🏦 ${t.transferLabel || "Transferência"}`;
+    if (tipoTransacaoSelecionado === "EXPENSE") {
+      cartoes.forEach((c) => {
+        cardOptions.push({
+          type: "CARD",
+          id: String(c.id),
+          label: c.nome || c.name || "",
+          card: c,
+        });
+      });
+      // Ordena os cartões por ordem alfabética
+      cardOptions.sort((a, b) => a.label.localeCompare(b.label, idioma));
+    }
 
-      if (!grupos[key]) {
-        grupos[key] = {
-          label,
-          items: [],
-          color: isCard
-            ? transacao.card?.color || transacao.card?.cor || theme.textMain
-            : isPix
-              ? "#32bcad"
-              : "#0277bd",
-        };
+    // 2. Array das Opções Fixas (Cravadas no final em ordem P, S, T)
+    const fixedOptions: Array<{
+      type: "PIX" | "ACCOUNT" | "BALANCE";
+      id: string;
+      label: string;
+    }> = [];
+
+    fixedOptions.push({ type: "PIX", id: "PIX", label: "Pix" });
+
+    if (tipoTransacaoSelecionado === "EXPENSE") {
+      fixedOptions.push({
+        type: "BALANCE",
+        id: "BALANCE",
+        label: t.balanceOption || "Saldo em Conta",
+      });
+    }
+
+    fixedOptions.push({
+      type: "ACCOUNT",
+      id: "ACCOUNT",
+      label: t.transferLabel || "Transferência",
+    });
+
+    // Concatena os cartões (alfabéticos) e coloca os fixos sempre em baixo
+    return [...cardOptions, ...fixedOptions];
+  };
+
+  const getStatementGroups = () => {
+    const groupsList: Array<{
+      id: string;
+      title: string;
+      subtitle: string;
+      icon: string;
+      color: string;
+      bgColor: string;
+      isCard: boolean;
+      transactions: Transacao[];
+    }> = [];
+
+    // 1. Adiciona os Cartões (Ordenados Alfabeticamente)
+    const cartoesOrdenados = [...cartoes].sort((a, b) => {
+      const nomeA = a.nome || a.name || "";
+      const nomeB = b.nome || b.name || "";
+      return nomeA.localeCompare(nomeB, idioma);
+    });
+
+    cartoesOrdenados.forEach((c) => {
+      groupsList.push({
+        id: `card-${c.id}`,
+        title: c.nome || c.name || "Cartão",
+        subtitle: `**** ${c.lastDigits}`,
+        icon: "💳",
+        color: "#fff",
+        bgColor: c.color || c.cor || "#333",
+        isCard: true,
+        transactions: [],
+      });
+    });
+
+    // 2. Adiciona as opções fixas (Sempre no final: Pix, Saldo em Conta, Transferência)
+    groupsList.push({
+      id: "pix",
+      title: "Pix",
+      subtitle: "Transferência",
+      icon: "⚡",
+      color: "#fff",
+      bgColor: "#32bcad",
+      isCard: false,
+      transactions: [],
+    });
+
+    groupsList.push({
+      id: "balance",
+      title: t.balanceOption || "Saldo em Conta",
+      subtitle: "Débito direto",
+      icon: "💰",
+      color: "#fff",
+      bgColor: "#827717",
+      isCard: false,
+      transactions: [],
+    });
+
+    groupsList.push({
+      id: "account",
+      title: t.transferLabel || "Transferência",
+      subtitle: "TED/DOC",
+      icon: "🏦",
+      color: "#fff",
+      bgColor: "#0277bd",
+      isCard: false,
+      transactions: [],
+    });
+
+    // 3. Distribui as transações
+    transacoesFiltradas.forEach((t_row) => {
+      let keyId = "";
+      if (t_row.card) {
+        keyId = `card-${t_row.card.id}`;
+      } else if (t_row.paymentMethod === "PIX") {
+        keyId = "pix";
+      } else if (t_row.paymentMethod === "BALANCE") {
+        keyId = "balance";
+      } else {
+        keyId = "account";
       }
-      grupos[key].items.push(transacao);
-      return grupos;
-    },
-    {} as Record<string, { label: string; items: Transacao[]; color: string }>,
-  );
+
+      const targetGroup = groupsList.find((g) => g.id === keyId);
+      if (targetGroup) {
+        targetGroup.transactions.push(t_row);
+      }
+    });
+
+    return groupsList;
+  };
+
+  const statementGroups = getStatementGroups();
 
   const buscarCartoes = async () => {
     const token = localStorage.getItem("token");
@@ -727,50 +891,25 @@ export function Dashboard() {
   };
 
   // ==========================================
-  // FUNÇÕES DE EXIBIÇÃO
+  // FUNÇÕES AUXILIARES
   // ==========================================
   const getCategoriasDisponiveis = () => {
     const catKeys =
       tipoTransacaoSelecionado === "INCOME"
-        ? ["SALARY", "SALES"]
-        : ["BILLS", "ENTERTAINMENT", "FOOD", "MARKET", "TRANSPORT"];
+        ? ["SALARY", "SALES", "INVESTMENTS"]
+        : [
+            "BILLS",
+            "ENTERTAINMENT",
+            "FOOD",
+            "MARKET",
+            "TRANSPORT",
+            "INVESTMENTS",
+          ];
 
     catKeys.sort((a, b) =>
       categoryMap[a][idioma].localeCompare(categoryMap[b][idioma]),
     );
     return [...catKeys, "OTHER"];
-  };
-
-  // Função que retorna a lista de formas de pagamento em Ordem Alfabética (A-Z)
-  const getPaymentOptions = () => {
-    const options: Array<{
-      type: "PIX" | "ACCOUNT" | "CARD";
-      id: string;
-      label: string;
-      card?: Cartao;
-    }> = [];
-
-    options.push({ type: "PIX", id: "PIX", label: "Pix" });
-    options.push({
-      type: "ACCOUNT",
-      id: "ACCOUNT",
-      label: t.transferLabel || "Transferência",
-    });
-
-    if (tipoTransacaoSelecionado === "EXPENSE") {
-      cartoes.forEach((c) => {
-        options.push({
-          type: "CARD",
-          id: String(c.id),
-          label: c.nome || c.name || "",
-          card: c,
-        });
-      });
-    }
-
-    // Ordenação Alfabética considerando o idioma
-    options.sort((a, b) => a.label.localeCompare(b.label, idioma));
-    return options;
   };
 
   const getValorExibicao = (valorBaseReal: number) => {
@@ -816,10 +955,6 @@ export function Dashboard() {
       es: "es-ES",
       fr: "fr-FR",
       de: "de-DE",
-      it: "it-IT",
-      ja: "ja-JP",
-      zh: "zh-CN",
-      ko: "ko-KR",
     };
     return new Date(
       Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])),
@@ -828,6 +963,44 @@ export function Dashboard() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+    });
+  };
+
+  const formatarDataInput = (dataString: string) => {
+    if (!dataString) return "---";
+    const [anoStr, mesStr, diaStr] = dataString.split("-");
+    const mapaLocais: Record<IdiomaType, string> = {
+      pt: "pt-BR",
+      en: "en-US",
+      es: "es-ES",
+      fr: "fr-FR",
+      de: "de-DE",
+    };
+    return new Date(
+      Date.UTC(Number(anoStr), Number(mesStr) - 1, Number(diaStr)),
+    ).toLocaleDateString(mapaLocais[idioma], {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const agruparTransacoesPorDia = (transacoesParaAgrupar: Transacao[]) => {
+    const grupos: Record<string, Transacao[]> = {};
+
+    transacoesParaAgrupar.forEach((t_row) => {
+      const dataFormatada = formatarDataLocal(t_row.transactionDate);
+      if (!grupos[dataFormatada]) {
+        grupos[dataFormatada] = [];
+      }
+      grupos[dataFormatada].push(t_row);
+    });
+
+    return Object.entries(grupos).sort((a, b) => {
+      const dateA = new Date(a[1][0].transactionDate as string).getTime();
+      const dateB = new Date(b[1][0].transactionDate as string).getTime();
+      return dateB - dateA;
     });
   };
 
@@ -924,7 +1097,6 @@ export function Dashboard() {
         transition: "background-color 0.3s ease",
       }}
     >
-      {/* CÓDIGO DO TOAST (NOTIFICAÇÃO) */}
       <style>{`
         @keyframes slideUpToast { from { bottom: -50px; opacity: 0; } to { bottom: 30px; opacity: 1; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -954,7 +1126,6 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* CÓDIGO DO LOADING GERAL (OVERLAY) */}
       {isLoading && (
         <div
           style={{
@@ -996,7 +1167,6 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* OVERLAY DO MENU MOBILE */}
       {menuAberto && (
         <div
           onClick={() => setMenuAberto(false)}
@@ -1012,7 +1182,6 @@ export function Dashboard() {
         />
       )}
 
-      {/* SIDEBAR (MENU LATERAL) */}
       <div
         style={{
           position: "fixed",
@@ -1070,7 +1239,6 @@ export function Dashboard() {
         </ul>
       </div>
 
-      {/* HEADER (CABEÇALHO) */}
       <header
         style={{
           backgroundColor: "#d91616",
@@ -1173,7 +1341,6 @@ export function Dashboard() {
         </div>
       </header>
 
-      {/* ÁREA DE CONTEÚDO */}
       <div
         style={{
           padding: isMobile ? "0 1rem 1rem 1rem" : "0 2rem 2rem 2rem",
@@ -1184,7 +1351,6 @@ export function Dashboard() {
         {/* ================= ABA 1: HOME ================= */}
         {abaAtiva === "home" && (
           <>
-            {/* Card Saldo Principal */}
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -1335,7 +1501,6 @@ export function Dashboard() {
               )}
             </div>
 
-            {/* Formulário de Transação */}
             <div
               style={{
                 marginTop: "1.5rem",
@@ -1361,7 +1526,7 @@ export function Dashboard() {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: "20px",
+                  gap: "15px",
                 }}
               >
                 <div
@@ -1373,7 +1538,7 @@ export function Dashboard() {
                     padding: "4px",
                     border: `1px solid ${theme.border}`,
                     width: isMobile ? "100%" : "fit-content",
-                    margin: "0 auto",
+                    margin: "0 auto 5px auto",
                   }}
                 >
                   {(["EXPENSE", "INCOME"] as const).map((type) => {
@@ -1582,6 +1747,19 @@ export function Dashboard() {
                               {t.transferLabel || "Transferência"}
                             </span>
                           </>
+                        ) : formaPagamento === "BALANCE" ? (
+                          <>
+                            <span style={{ fontSize: "1.1rem" }}>💰</span>
+                            <span
+                              style={{
+                                fontSize: "0.9rem",
+                                color: theme.textMain,
+                                fontWeight: "500",
+                              }}
+                            >
+                              {t.balanceOption || "Saldo em Conta"}
+                            </span>
+                          </>
                         ) : cartaoSelecionado ? (
                           <>
                             <span
@@ -1640,7 +1818,7 @@ export function Dashboard() {
                           <PaymentMethodOption
                             key={opt.id}
                             tipo={opt.type}
-                            card={opt.card}
+                            card={opt.type === "CARD" ? opt.card : undefined}
                             label={opt.label}
                             theme={theme}
                             onSelect={() => {
@@ -1657,10 +1835,9 @@ export function Dashboard() {
 
                 <div
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
+                    display: "flex",
+                    flexDirection: "column",
                     gap: "15px",
-                    alignItems: "flex-end",
                   }}
                 >
                   <div>
@@ -1695,46 +1872,326 @@ export function Dashboard() {
                       }}
                     />
                   </div>
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 6px 0",
-                        fontSize: "0.75rem",
-                        color: theme.textMuted,
-                        fontWeight: "600",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        textAlign: isMobile ? "left" : "right",
-                      }}
-                    >
-                      {t.valueLabel || "Valor"}
-                    </p>
-                    <input
-                      type="text"
-                      required
-                      value={novoValor}
-                      onChange={handleValorChange}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        borderRadius: "10px",
-                        border: `1px solid ${theme.border}`,
-                        backgroundColor: theme.inputBg,
-                        color: theme.textMain,
-                        outline: "none",
-                        textAlign: isMobile ? "left" : "right",
-                        fontSize: "0.9rem",
-                        boxSizing: "border-box",
-                        fontWeight: "600",
-                        transition: "border-color 0.2s",
-                      }}
-                    />
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gap: "15px",
+                      alignItems: "flex-end",
+                    }}
+                  >
+                    <div ref={dataPickerRef} style={{ position: "relative" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px 0",
+                          fontSize: "0.75rem",
+                          color: theme.textMuted,
+                          fontWeight: "600",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        {t.dateLabel || "Data"}
+                      </p>
+                      <div
+                        onClick={() => {
+                          if (!isDataPickerOpen) {
+                            const [ano, mes] = dataTransacao.split("-");
+                            setPickerInsertYear(parseInt(ano, 10));
+                            setPickerInsertMonth(parseInt(mes, 10));
+                            setPickerInsertMode("day");
+                          }
+                          setIsDataPickerOpen(!isDataPickerOpen);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: theme.inputBg,
+                          cursor: "pointer",
+                          transition: "border-color 0.2s",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.9rem",
+                            color: theme.textMain,
+                            fontWeight: "500",
+                          }}
+                        >
+                          {formatarDataInput(dataTransacao)}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            color: theme.textMuted,
+                            transform: isDataPickerOpen
+                              ? "rotate(180deg)"
+                              : "none",
+                            transition: "transform 0.2s",
+                          }}
+                        >
+                          ▼
+                        </span>
+                      </div>
+
+                      {isDataPickerOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 5px)",
+                            left: 0,
+                            backgroundColor: theme.bgCard,
+                            borderRadius: "16px",
+                            boxShadow: theme.shadow,
+                            padding: "16px",
+                            zIndex: 1005,
+                            width: "250px",
+                            border: `1px solid ${theme.border}`,
+                          }}
+                        >
+                          {pickerInsertMode === "month" ? (
+                            <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: "16px",
+                                  padding: "0 4px",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPickerInsertYear((y) => y - 1);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "1.1rem",
+                                    color: theme.textSec,
+                                  }}
+                                >
+                                  ❮
+                                </button>
+                                <span
+                                  style={{
+                                    fontWeight: "bold",
+                                    fontSize: "1.1rem",
+                                    color: theme.textMain,
+                                  }}
+                                >
+                                  {pickerInsertYear}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPickerInsertYear((y) => y + 1);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "1.1rem",
+                                    color: theme.textSec,
+                                  }}
+                                >
+                                  ❯
+                                </button>
+                              </div>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(3, 1fr)",
+                                  gap: "8px",
+                                }}
+                              >
+                                {t.months.map(
+                                  (monthName: string, index: number) => {
+                                    const isSelected =
+                                      pickerInsertMonth === index + 1 &&
+                                      pickerInsertYear ===
+                                        parseInt(
+                                          dataTransacao.split("-")[0],
+                                          10,
+                                        );
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={index}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPickerInsertMonth(index + 1);
+                                          setPickerInsertMode("day");
+                                        }}
+                                        style={{
+                                          padding: "10px 0",
+                                          border: "none",
+                                          borderRadius: "10px",
+                                          backgroundColor: isSelected
+                                            ? "#d91616"
+                                            : theme.inputBg,
+                                          color: isSelected
+                                            ? "#fff"
+                                            : theme.textSec,
+                                          fontWeight: isSelected
+                                            ? "bold"
+                                            : "500",
+                                          cursor: "pointer",
+                                          fontSize: "0.85rem",
+                                        }}
+                                      >
+                                        {monthName.slice(0, 3)}
+                                      </button>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: "12px",
+                                  padding: "0 4px",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPickerInsertMode("month");
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "0.9rem",
+                                    color: theme.textSec,
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  ❮ {t.back || "Voltar"}
+                                </button>
+                                <span
+                                  style={{
+                                    fontWeight: "bold",
+                                    color: theme.textMain,
+                                    fontSize: "0.95rem",
+                                  }}
+                                >
+                                  {t.months[pickerInsertMonth - 1]}{" "}
+                                  {pickerInsertYear}
+                                </span>
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(7, 1fr)",
+                                  gap: "4px",
+                                }}
+                              >
+                                {Array.from(
+                                  {
+                                    length: new Date(
+                                      pickerInsertYear,
+                                      pickerInsertMonth,
+                                      0,
+                                    ).getDate(),
+                                  },
+                                  (_, i) => i + 1,
+                                ).map((dia) => {
+                                  const dataFormatadaStr = `${pickerInsertYear}-${String(pickerInsertMonth).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+                                  const isSelected =
+                                    dataTransacao === dataFormatadaStr;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={dia}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDataTransacao(dataFormatadaStr);
+                                        setIsDataPickerOpen(false);
+                                      }}
+                                      style={{
+                                        padding: "8px 0",
+                                        borderRadius: "8px",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        backgroundColor: isSelected
+                                          ? "#d91616"
+                                          : theme.inputBg,
+                                        color: isSelected
+                                          ? "#fff"
+                                          : theme.textSec,
+                                        fontWeight: isSelected ? "bold" : "500",
+                                        fontSize: "0.85rem",
+                                      }}
+                                    >
+                                      {dia}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p
+                        style={{
+                          margin: "0 0 6px 0",
+                          fontSize: "0.75rem",
+                          color: theme.textMuted,
+                          fontWeight: "600",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          textAlign: isMobile ? "left" : "right",
+                        }}
+                      >
+                        {t.valueLabel || "Valor"}
+                      </p>
+                      <input
+                        type="text"
+                        required
+                        value={novoValor}
+                        onChange={handleValorChange}
+                        style={{
+                          width: "100%",
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: theme.inputBg,
+                          color: theme.textMain,
+                          outline: "none",
+                          textAlign: isMobile ? "left" : "right",
+                          fontSize: "0.9rem",
+                          boxSizing: "border-box",
+                          fontWeight: "600",
+                          transition: "border-color 0.2s",
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <button
                   type="submit"
                   style={{
+                    marginTop: "10px",
                     padding: "12px 20px",
                     backgroundColor: "#d91616",
                     color: "white",
@@ -1744,7 +2201,7 @@ export function Dashboard() {
                     cursor: "pointer",
                     fontSize: "0.95rem",
                     alignSelf: isMobile ? "stretch" : "center",
-                    minWidth: isMobile ? "auto" : "150px",
+                    minWidth: isMobile ? "auto" : "200px",
                     boxShadow: "0 4px 12px rgba(217, 22, 22, 0.2)",
                   }}
                 >
@@ -1753,7 +2210,7 @@ export function Dashboard() {
               </form>
             </div>
 
-            {/* Histórico Filtrado na Home */}
+            {/* Histórico Filtrado na Home - AGRUPADO POR DIA */}
             <div
               style={{
                 marginTop: "1.5rem",
@@ -1774,165 +2231,197 @@ export function Dashboard() {
               >
                 {t.history}
               </h3>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  {transacoes
-                    .filter((t_row) => t_row.type === tipoTransacaoSelecionado)
-                    .map((t_row, i) => {
-                      const isExpense = t_row.type === "EXPENSE";
-                      const infoExibicao = getValorExibicao(
-                        Math.abs(t_row.amount || 0),
-                      );
-                      const categoriaVisual =
-                        categoryMap[t_row.category || "OTHER"] ||
-                        categoryMap["OTHER"];
-                      const isOutros =
-                        !t_row.category || t_row.category === "OTHER";
-                      const corDeFundoIcone = isOutros
-                        ? isExpense
-                          ? isDarkMode
-                            ? "#4a1c1c"
-                            : "#ffebee"
-                          : isDarkMode
-                            ? "#1b3320"
-                            : "#e8f5e9"
-                        : categoriaVisual.bgColor;
 
-                      return (
-                        <tr
-                          key={t_row.id || i}
-                          style={{ borderBottom: `1px solid ${theme.border}` }}
-                        >
-                          <td
+              {agruparTransacoesPorDia(
+                transacoes.filter(
+                  (t_row) => t_row.type === tipoTransacaoSelecionado,
+                ),
+              ).map(([dataGrupo, itensDoGrupo]) => (
+                <div key={dataGrupo} style={{ marginBottom: "1.5rem" }}>
+                  <h4
+                    style={{
+                      margin: "0 0 10px 0",
+                      fontSize: "0.85rem",
+                      color: theme.textMain,
+                      textTransform: "uppercase",
+                      letterSpacing: "1px",
+                      borderBottom: `1px solid ${theme.border}`,
+                      paddingBottom: "5px",
+                    }}
+                  >
+                    {dataGrupo}
+                  </h4>
+
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                      {itensDoGrupo.map((t_row, i) => {
+                        const isExpense = t_row.type === "EXPENSE";
+                        const infoExibicao = getValorExibicao(
+                          Math.abs(t_row.amount || 0),
+                        );
+                        const categoriaVisual =
+                          categoryMap[t_row.category || "OTHER"] ||
+                          categoryMap["OTHER"];
+                        const isOutros =
+                          !t_row.category || t_row.category === "OTHER";
+                        const corDeFundoIcone = isOutros
+                          ? isExpense
+                            ? isDarkMode
+                              ? "#4a1c1c"
+                              : "#ffebee"
+                            : isDarkMode
+                              ? "#1b3320"
+                              : "#e8f5e9"
+                          : categoriaVisual.bgColor;
+
+                        return (
+                          <tr
+                            key={t_row.id || i}
                             style={{
-                              padding: "14px 0",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "15px",
+                              borderBottom: `1px solid ${theme.border}`,
                             }}
                           >
-                            <div
+                            <td
                               style={{
-                                width: "40px",
-                                height: "40px",
-                                borderRadius: "10px",
-                                backgroundColor: corDeFundoIcone,
+                                padding: "14px 0",
                                 display: "flex",
-                                justifyContent: "center",
                                 alignItems: "center",
-                                fontSize: "1.2rem",
+                                gap: "15px",
                               }}
-                              title={categoriaVisual[idioma]}
                             >
-                              {categoriaVisual.emoji}
-                            </div>
-                            <div>
                               <div
                                 style={{
-                                  fontWeight: "500",
-                                  color: theme.textMain,
+                                  width: "40px",
+                                  height: "40px",
+                                  borderRadius: "10px",
+                                  backgroundColor: corDeFundoIcone,
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  fontSize: "1.2rem",
+                                }}
+                                title={categoriaVisual[idioma]}
+                              >
+                                {categoriaVisual.emoji}
+                              </div>
+                              <div>
+                                <div
+                                  style={{
+                                    fontWeight: "500",
+                                    color: theme.textMain,
+                                    fontSize: "0.95rem",
+                                  }}
+                                >
+                                  {t_row.description}
+                                </div>
+                                <div
+                                  style={{
+                                    color: theme.textMuted,
+                                    fontSize: "0.75rem",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: isExpense
+                                        ? theme.red
+                                        : theme.green,
+                                      fontWeight: "bold",
+                                      marginRight: "6px",
+                                    }}
+                                  >
+                                    {categoriaVisual[idioma]}
+                                  </span>
+                                  {t_row.card ? (
+                                    <span
+                                      style={{
+                                        color:
+                                          t_row.card.color ||
+                                          t_row.card.cor ||
+                                          theme.textMuted,
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 💳 {t_row.card.name || t_row.card.nome}
+                                    </span>
+                                  ) : t_row.paymentMethod === "PIX" ? (
+                                    <span
+                                      style={{
+                                        color: "#32bcad",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • ⚡ Pix
+                                    </span>
+                                  ) : t_row.paymentMethod === "BALANCE" ? (
+                                    <span
+                                      style={{
+                                        color: "#827717",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 💰 {t.balanceOption || "Saldo em Conta"}
+                                    </span>
+                                  ) : t_row.paymentMethod === "ACCOUNT" ? (
+                                    <span
+                                      style={{
+                                        color: "#0277bd",
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 🏦 {t.transferLabel || "Transferência"}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        color: theme.textMuted,
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      • 🏦 {t.transferLabel || "Transferência"}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td
+                              style={{ padding: "14px 0", textAlign: "right" }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: "600",
+                                  color: isExpense ? theme.red : theme.green,
                                   fontSize: "0.95rem",
                                 }}
                               >
-                                {t_row.description}
+                                {isExpense ? "- " : "+ "} {infoExibicao.simbolo}{" "}
+                                {infoExibicao.valorFormatado}
                               </div>
-                              <div
+                            </td>
+                            <td style={{ width: "40px", textAlign: "right" }}>
+                              <button
+                                onClick={() =>
+                                  handleDeleteTransaction(t_row.id)
+                                }
                                 style={{
+                                  background: "none",
+                                  border: "none",
                                   color: theme.textMuted,
-                                  fontSize: "0.75rem",
-                                  marginTop: "4px",
+                                  cursor: "pointer",
+                                  fontSize: "1.2rem",
                                 }}
                               >
-                                <span
-                                  style={{
-                                    color: isExpense ? theme.red : theme.green,
-                                    fontWeight: "bold",
-                                    marginRight: "6px",
-                                  }}
-                                >
-                                  {categoriaVisual[idioma]}
-                                </span>
-                                • {formatarDataLocal(t_row.transactionDate)}
-                                {/* Lógica Visual: Pix vs Transferência vs Cartão */}
-                                {t_row.card ? (
-                                  <span
-                                    style={{
-                                      marginLeft: "6px",
-                                      color:
-                                        t_row.card.color ||
-                                        t_row.card.cor ||
-                                        theme.textMuted,
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    • 💳 {t_row.card.name || t_row.card.nome}
-                                  </span>
-                                ) : t_row.paymentMethod === "PIX" ? (
-                                  <span
-                                    style={{
-                                      marginLeft: "6px",
-                                      color: "#32bcad",
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    • ⚡ Pix
-                                  </span>
-                                ) : t_row.paymentMethod === "ACCOUNT" ? (
-                                  <span
-                                    style={{
-                                      marginLeft: "6px",
-                                      color: "#0277bd",
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    • 🏦 {t.transferLabel || "Transferência"}
-                                  </span>
-                                ) : (
-                                  <span
-                                    style={{
-                                      marginLeft: "6px",
-                                      color: theme.textMuted,
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    • 🏦 {t.transferLabel || "Transferência"} /
-                                    ⚡ Pix
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: "14px 0", textAlign: "right" }}>
-                            <div
-                              style={{
-                                fontWeight: "600",
-                                color: isExpense ? theme.red : theme.green,
-                                fontSize: "0.95rem",
-                              }}
-                            >
-                              {isExpense ? "- " : "+ "} {infoExibicao.simbolo}{" "}
-                              {infoExibicao.valorFormatado}
-                            </div>
-                          </td>
-                          <td style={{ width: "40px", textAlign: "right" }}>
-                            <button
-                              onClick={() => handleDeleteTransaction(t_row.id)}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                color: theme.textMuted,
-                                cursor: "pointer",
-                                fontSize: "1.2rem",
-                              }}
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+
               {transacoes.filter(
                 (t_row) => t_row.type === tipoTransacaoSelecionado,
               ).length === 0 && (
@@ -1951,190 +2440,12 @@ export function Dashboard() {
           </>
         )}
 
-        {/* ================= ABA 2: EXTRATO DETALHADO ================= */}
+        {/* ================= ABA 2: EXTRATO DETALHADO (ACCORDION CARDS) ================= */}
         {abaAtiva === "statement" && (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            <div
-              style={{
-                backgroundColor: theme.bgCard,
-                padding: isMobile ? "1.2rem 1rem" : "1.5rem 2rem",
-                borderRadius: "16px",
-                display: "flex",
-                flexDirection: isMobile ? "column" : "row",
-                justifyContent: "space-between",
-                alignItems: isMobile ? "flex-start" : "center",
-                gap: isMobile ? "15px" : "0",
-                boxShadow: theme.shadow,
-                transition: "background-color 0.3s ease",
-              }}
-            >
-              <h2
-                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
-              >
-                📊 {t.statement}
-              </h2>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  backgroundColor: theme.inputBg,
-                  borderRadius: "12px",
-                  padding: "4px",
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <button
-                  onClick={handleMesAnterior}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "8px 12px",
-                    fontSize: "1.1rem",
-                    color: theme.textSec,
-                    borderRadius: "8px",
-                  }}
-                >
-                  ❮
-                </button>
-                <div ref={monthPickerRef} style={{ position: "relative" }}>
-                  <div
-                    onClick={() => {
-                      setPickerYear(anoFiltro);
-                      setIsMonthPickerOpen(!isMonthPickerOpen);
-                    }}
-                    style={{
-                      minWidth: "140px",
-                      textAlign: "center",
-                      fontWeight: "600",
-                      color: theme.textMain,
-                      fontSize: "1rem",
-                      userSelect: "none",
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                      borderRadius: "8px",
-                    }}
-                  >
-                    {t.months[mesFiltro - 1]} {anoFiltro}
-                  </div>
-                  {isMonthPickerOpen && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        backgroundColor: theme.bgCard,
-                        borderRadius: "16px",
-                        boxShadow: theme.shadow,
-                        padding: "16px",
-                        zIndex: 1005,
-                        width: "240px",
-                        border: `1px solid ${theme.border}`,
-                        marginTop: "8px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "16px",
-                          padding: "0 4px",
-                        }}
-                      >
-                        <button
-                          onClick={() => setPickerYear((y) => y - 1)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "1.1rem",
-                            color: theme.textSec,
-                          }}
-                        >
-                          ❮
-                        </button>
-                        <span
-                          style={{
-                            fontWeight: "bold",
-                            fontSize: "1.1rem",
-                            color: theme.textMain,
-                          }}
-                        >
-                          {pickerYear}
-                        </span>
-                        <button
-                          onClick={() => setPickerYear((y) => y + 1)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "1.1rem",
-                            color: theme.textSec,
-                          }}
-                        >
-                          ❯
-                        </button>
-                      </div>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, 1fr)",
-                          gap: "8px",
-                        }}
-                      >
-                        {t.months.map((monthName: string, index: number) => {
-                          const isSelected =
-                            mesFiltro === index + 1 && anoFiltro === pickerYear;
-                          return (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                setMesFiltro(index + 1);
-                                setAnoFiltro(pickerYear);
-                                setIsMonthPickerOpen(false);
-                              }}
-                              style={{
-                                padding: "10px 0",
-                                border: "none",
-                                borderRadius: "10px",
-                                backgroundColor: isSelected
-                                  ? "#d91616"
-                                  : theme.inputBg,
-                                color: isSelected ? "#fff" : theme.textSec,
-                                fontWeight: isSelected ? "bold" : "500",
-                                cursor: "pointer",
-                                fontSize: "0.85rem",
-                              }}
-                            >
-                              {monthName.slice(0, 3)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={handleMesSeguinte}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "8px 12px",
-                    fontSize: "1.1rem",
-                    color: theme.textSec,
-                    borderRadius: "8px",
-                  }}
-                >
-                  ❯
-                </button>
-              </div>
-            </div>
-
+            {/* Header com as 3 caixas de resumo (Entrada, Saída, Balanço) */}
             <div
               style={{
                 display: "grid",
@@ -2264,6 +2575,7 @@ export function Dashboard() {
               </div>
             </div>
 
+            {/* Container Principal do Extrato */}
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -2273,214 +2585,682 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              <h3
+              {/* Título e Date Picker juntos */}
+              <div
                 style={{
-                  margin: "0 0 15px 0",
-                  color: theme.textMain,
-                  fontSize: "1.1rem",
-                  fontWeight: "600",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "20px",
+                  flexWrap: "wrap",
+                  gap: "10px",
                 }}
               >
-                {t.periodTransactions}
-              </h3>
-              {Object.entries(transacoesAgrupadas).map(([key, grupo]) => (
-                <div key={key} style={{ marginBottom: "2.5rem" }}>
-                  <h4
+                <h3
+                  style={{
+                    margin: 0,
+                    color: theme.textMain,
+                    fontSize: "1.1rem",
+                    fontWeight: "600",
+                  }}
+                >
+                  {t.periodTransactions}
+                </h3>
+
+                {/* Filtro de Data (Mês e Dia) */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    backgroundColor: theme.inputBg,
+                    borderRadius: "12px",
+                    padding: "4px",
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <button
+                    onClick={handleMesAnterior}
                     style={{
-                      color: grupo.color,
-                      borderBottom: `2px solid ${grupo.color}30`,
-                      paddingBottom: "8px",
-                      marginBottom: "15px",
-                      display: "flex",
-                      alignItems: "center",
-                      fontSize: "1.0rem",
-                      fontWeight: "600",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "8px 12px",
+                      fontSize: "1.1rem",
+                      color: theme.textSec,
+                      borderRadius: "8px",
                     }}
                   >
-                    {grupo.label}
-                  </h4>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <tbody>
-                      {grupo.items.map((t_row, i) => {
-                        const isExpense = t_row.type === "EXPENSE";
-                        const infoExibicao = getValorExibicao(
-                          Math.abs(t_row.amount || 0),
-                        );
-                        const categoriaVisual =
-                          categoryMap[t_row.category || "OTHER"] ||
-                          categoryMap["OTHER"];
-                        const isOutros =
-                          !t_row.category || t_row.category === "OTHER";
-                        const corDeFundoIcone = isOutros
-                          ? isExpense
-                            ? isDarkMode
-                              ? "#4a1c1c"
-                              : "#ffebee"
-                            : isDarkMode
-                              ? "#1b3320"
-                              : "#e8f5e9"
-                          : categoriaVisual.bgColor;
-
-                        return (
-                          <tr
-                            key={t_row.id || i}
-                            style={{
-                              borderBottom: `1px solid ${theme.border}`,
-                            }}
-                          >
-                            <td
+                    ❮
+                  </button>
+                  <div ref={monthPickerRef} style={{ position: "relative" }}>
+                    <div
+                      onClick={() => {
+                        if (!isMonthPickerOpen) {
+                          setPickerYear(anoFiltro);
+                          setPickerMode("month");
+                        }
+                        setIsMonthPickerOpen(!isMonthPickerOpen);
+                      }}
+                      style={{
+                        minWidth: "150px",
+                        textAlign: "center",
+                        fontWeight: "600",
+                        color: theme.textMain,
+                        fontSize: "1rem",
+                        userSelect: "none",
+                        cursor: "pointer",
+                        padding: "6px 8px",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      {diaFiltro
+                        ? `${diaFiltro} ${t.months[mesFiltro - 1].slice(0, 3)} ${anoFiltro}`
+                        : `${t.months[mesFiltro - 1]} ${anoFiltro}`}
+                    </div>
+                    {isMonthPickerOpen && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          backgroundColor: theme.bgCard,
+                          borderRadius: "16px",
+                          boxShadow: theme.shadow,
+                          padding: "16px",
+                          zIndex: 1005,
+                          width: "250px",
+                          border: `1px solid ${theme.border}`,
+                          marginTop: "8px",
+                        }}
+                      >
+                        {pickerMode === "month" ? (
+                          <>
+                            <div
                               style={{
-                                padding: "14px 0",
                                 display: "flex",
+                                justifyContent: "space-between",
                                 alignItems: "center",
-                                gap: "15px",
+                                marginBottom: "16px",
+                                padding: "0 4px",
                               }}
                             >
-                              <div
-                                style={{
-                                  width: "40px",
-                                  height: "40px",
-                                  borderRadius: "10px",
-                                  backgroundColor: corDeFundoIcone,
-                                  display: "flex",
-                                  justifyContent: "center",
-                                  alignItems: "center",
-                                  fontSize: "1.2rem",
-                                }}
-                                title={categoriaVisual[idioma]}
-                              >
-                                {categoriaVisual.emoji}
-                              </div>
-                              <div>
-                                <div
-                                  style={{
-                                    fontWeight: "500",
-                                    color: theme.textMain,
-                                    fontSize: "0.95rem",
-                                  }}
-                                >
-                                  {t_row.description}
-                                </div>
-                                <div
-                                  style={{
-                                    color: theme.textMuted,
-                                    fontSize: "0.75rem",
-                                    marginTop: "4px",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      color: isExpense
-                                        ? theme.red
-                                        : theme.green,
-                                      fontWeight: "bold",
-                                      marginRight: "6px",
-                                    }}
-                                  >
-                                    {categoriaVisual[idioma]}
-                                  </span>
-                                  • {formatarDataLocal(t_row.transactionDate)}
-                                  {/* Lógica Visual do Extrato: Pix vs Transferência vs Cartão */}
-                                  {t_row.card ? (
-                                    <span
-                                      style={{
-                                        marginLeft: "6px",
-                                        color:
-                                          t_row.card.color ||
-                                          t_row.card.cor ||
-                                          theme.textMuted,
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      • 💳 {t_row.card.name || t_row.card.nome}
-                                    </span>
-                                  ) : t_row.paymentMethod === "PIX" ? (
-                                    <span
-                                      style={{
-                                        marginLeft: "6px",
-                                        color: "#32bcad",
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      • ⚡ Pix
-                                    </span>
-                                  ) : t_row.paymentMethod === "ACCOUNT" ? (
-                                    <span
-                                      style={{
-                                        marginLeft: "6px",
-                                        color: "#0277bd",
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      • 🏦 {t.transferLabel || "Transferência"}
-                                    </span>
-                                  ) : (
-                                    <span
-                                      style={{
-                                        marginLeft: "6px",
-                                        color: theme.textMuted,
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      • 🏦 {t.transferLabel || "Transferência"}{" "}
-                                      / ⚡ Pix
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              style={{ padding: "14px 0", textAlign: "right" }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: "600",
-                                  color: isExpense ? theme.red : theme.green,
-                                  fontSize: "0.95rem",
-                                }}
-                              >
-                                {isExpense ? "- " : "+ "}
-                                {infoExibicao.simbolo}{" "}
-                                {infoExibicao.valorFormatado}
-                              </div>
-                            </td>
-                            <td style={{ width: "40px", textAlign: "right" }}>
                               <button
-                                onClick={() =>
-                                  handleDeleteTransaction(t_row.id)
-                                }
+                                onClick={() => setPickerYear((y) => y - 1)}
                                 style={{
                                   background: "none",
                                   border: "none",
-                                  color: theme.textMuted,
                                   cursor: "pointer",
-                                  fontSize: "1.2rem",
+                                  fontSize: "1.1rem",
+                                  color: theme.textSec,
                                 }}
                               >
-                                ×
+                                ❮
                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-              {transacoesFiltradas.length === 0 && (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                  <span style={{ fontSize: "2rem" }}>📭</span>
-                  <p
+                              <span
+                                style={{
+                                  fontWeight: "bold",
+                                  fontSize: "1.1rem",
+                                  color: theme.textMain,
+                                }}
+                              >
+                                {pickerYear}
+                              </span>
+                              <button
+                                onClick={() => setPickerYear((y) => y + 1)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "1.1rem",
+                                  color: theme.textSec,
+                                }}
+                              >
+                                ❯
+                              </button>
+                            </div>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(3, 1fr)",
+                                gap: "8px",
+                              }}
+                            >
+                              {t.months.map(
+                                (monthName: string, index: number) => {
+                                  const isSelected =
+                                    mesFiltro === index + 1 &&
+                                    anoFiltro === pickerYear;
+                                  return (
+                                    <button
+                                      key={index}
+                                      onClick={() => {
+                                        setMesFiltro(index + 1);
+                                        setAnoFiltro(pickerYear);
+                                        setPickerMode("day"); // Muda a tela para escolher o dia
+                                      }}
+                                      style={{
+                                        padding: "10px 0",
+                                        border: "none",
+                                        borderRadius: "10px",
+                                        backgroundColor: isSelected
+                                          ? "#d91616"
+                                          : theme.inputBg,
+                                        color: isSelected
+                                          ? "#fff"
+                                          : theme.textSec,
+                                        fontWeight: isSelected ? "bold" : "500",
+                                        cursor: "pointer",
+                                        fontSize: "0.85rem",
+                                      }}
+                                    >
+                                      {monthName.slice(0, 3)}
+                                    </button>
+                                  );
+                                },
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "12px",
+                                padding: "0 4px",
+                              }}
+                            >
+                              <button
+                                onClick={() => setPickerMode("month")}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "0.9rem",
+                                  color: theme.textSec,
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                ❮ {t.back || "Voltar"}
+                              </button>
+                              <span
+                                style={{
+                                  fontWeight: "bold",
+                                  color: theme.textMain,
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {t.months[mesFiltro - 1]} {anoFiltro}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setDiaFiltro(null);
+                                setIsMonthPickerOpen(false);
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "8px",
+                                marginBottom: "12px",
+                                borderRadius: "8px",
+                                border: "none",
+                                cursor: "pointer",
+                                backgroundColor:
+                                  diaFiltro === null
+                                    ? "#d91616"
+                                    : theme.inputBg,
+                                color:
+                                  diaFiltro === null ? "#fff" : theme.textSec,
+                                fontWeight: diaFiltro === null ? "bold" : "500",
+                                fontSize: "0.9rem",
+                              }}
+                            >
+                              {t.entireMonth || "Mês Inteiro"}
+                            </button>
+
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(7, 1fr)",
+                                gap: "4px",
+                              }}
+                            >
+                              {Array.from(
+                                {
+                                  length: new Date(
+                                    anoFiltro,
+                                    mesFiltro,
+                                    0,
+                                  ).getDate(),
+                                },
+                                (_, i) => i + 1,
+                              ).map((dia) => (
+                                <button
+                                  key={dia}
+                                  onClick={() => {
+                                    setDiaFiltro(dia);
+                                    setIsMonthPickerOpen(false);
+                                  }}
+                                  style={{
+                                    padding: "8px 0",
+                                    borderRadius: "8px",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    backgroundColor:
+                                      diaFiltro === dia
+                                        ? "#d91616"
+                                        : theme.inputBg,
+                                    color:
+                                      diaFiltro === dia
+                                        ? "#fff"
+                                        : theme.textSec,
+                                    fontWeight:
+                                      diaFiltro === dia ? "bold" : "500",
+                                    fontSize: "0.85rem",
+                                  }}
+                                >
+                                  {dia}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleMesSeguinte}
                     style={{
-                      color: theme.textMuted,
-                      fontSize: "0.95rem",
-                      marginTop: "10px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "8px 12px",
+                      fontSize: "1.1rem",
+                      color: theme.textSec,
+                      borderRadius: "8px",
                     }}
                   >
-                    {t.noTransactionsMonth}
-                  </p>
+                    ❯
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* LISTA DE CARDS ACORDEÃO */}
+              {statementGroups.map((group) => {
+                const isExpanded = expandedStatementGroup === group.id;
+                const currentFilter = statementInnerFilter[group.id] || "ALL";
+
+                // Filtro interno para Pix e Transferência
+                const filteredGroupTxs = group.transactions.filter((tx) => {
+                  if (currentFilter === "ALL") return true;
+                  return tx.type === currentFilter;
+                });
+
+                // Reutilizamos a função para agrupar as transações desse card específico por dias
+                const diasAgrupados = agruparTransacoesPorDia(filteredGroupTxs);
+
+                return (
+                  <div key={group.id} style={{ marginBottom: "1rem" }}>
+                    {/* O Card Clicável (Cabeçalho do Acordeão) */}
+                    <div
+                      onClick={() =>
+                        setExpandedStatementGroup(isExpanded ? null : group.id)
+                      }
+                      style={{
+                        backgroundColor: group.bgColor,
+                        color: group.color,
+                        padding: "1.2rem 1.5rem",
+                        borderRadius: isExpanded ? "16px 16px 0 0" : "16px",
+                        cursor: "pointer",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                        transition: "all 0.3s",
+                        position: "relative",
+                        zIndex: 2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "15px",
+                        }}
+                      >
+                        <span style={{ fontSize: "1.8rem" }}>{group.icon}</span>
+                        <div>
+                          <h3
+                            style={{
+                              margin: 0,
+                              fontSize: "1.1rem",
+                              fontWeight: "600",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            {group.title}
+                          </h3>
+                          {group.subtitle && (
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "0.8rem",
+                                opacity: 0.8,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                              }}
+                            >
+                              {group.subtitle}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "15px",
+                        }}
+                      >
+                        <span
+                          style={{ fontSize: "0.9rem", fontWeight: "bold" }}
+                        >
+                          {group.transactions.length} transações
+                        </span>
+                        <span
+                          style={{
+                            transform: isExpanded ? "rotate(180deg)" : "none",
+                            transition: "transform 0.3s",
+                            fontSize: "0.8rem",
+                          }}
+                        >
+                          ▼
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Conteúdo Expandido (As transações do Cartão/Pix/Conta) */}
+                    {isExpanded && (
+                      <div
+                        style={{
+                          backgroundColor: theme.bgCard,
+                          padding: "1.5rem",
+                          borderRadius: "0 0 16px 16px",
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+                          border: `1px solid ${theme.border}`,
+                          borderTop: "none",
+                          marginTop: "-5px",
+                          paddingTop: "20px", // compensa a margem negativa
+                        }}
+                      >
+                        {/* Botões de Filtro Interno (Só não exibe se for cartão ou saldo em conta) */}
+                        {!group.isCard && group.id !== "balance" && (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "5px",
+                              marginBottom: "20px",
+                              backgroundColor: theme.inputBg,
+                              padding: "4px",
+                              borderRadius: "10px",
+                              width: "fit-content",
+                              border: `1px solid ${theme.border}`,
+                            }}
+                          >
+                            <button
+                              onClick={() =>
+                                setStatementInnerFilter((p) => ({
+                                  ...p,
+                                  [group.id]: "ALL",
+                                }))
+                              }
+                              style={{
+                                background:
+                                  currentFilter === "ALL"
+                                    ? theme.highlightBg
+                                    : "transparent",
+                                border: "none",
+                                padding: "6px 15px",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                fontSize: "0.85rem",
+                                fontWeight: "600",
+                                color: theme.textMain,
+                              }}
+                            >
+                              {t.all || "Todos"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                setStatementInnerFilter((p) => ({
+                                  ...p,
+                                  [group.id]: "INCOME",
+                                }))
+                              }
+                              style={{
+                                background:
+                                  currentFilter === "INCOME"
+                                    ? theme.highlightBg
+                                    : "transparent",
+                                border: "none",
+                                padding: "6px 15px",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                fontSize: "0.85rem",
+                                fontWeight: "600",
+                                color:
+                                  currentFilter === "INCOME"
+                                    ? theme.green
+                                    : theme.textMain,
+                              }}
+                            >
+                              {t.received || "Recebidos"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                setStatementInnerFilter((p) => ({
+                                  ...p,
+                                  [group.id]: "EXPENSE",
+                                }))
+                              }
+                              style={{
+                                background:
+                                  currentFilter === "EXPENSE"
+                                    ? theme.highlightBg
+                                    : "transparent",
+                                border: "none",
+                                padding: "6px 15px",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                fontSize: "0.85rem",
+                                fontWeight: "600",
+                                color:
+                                  currentFilter === "EXPENSE"
+                                    ? theme.red
+                                    : theme.textMain,
+                              }}
+                            >
+                              {t.sent || "Enviados"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Lista de Transações daquele Método (Agrupada por Dias) */}
+                        {diasAgrupados.length === 0 ? (
+                          <p
+                            style={{
+                              textAlign: "center",
+                              color: theme.textMuted,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            {t.noTransactions}
+                          </p>
+                        ) : (
+                          diasAgrupados.map(([dataGrupo, itensDoGrupo]) => (
+                            <div
+                              key={dataGrupo}
+                              style={{ marginBottom: "1.5rem" }}
+                            >
+                              <h4
+                                style={{
+                                  margin: "0 0 10px 0",
+                                  fontSize: "0.85rem",
+                                  color: theme.textMain,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "1px",
+                                  borderBottom: `1px solid ${theme.border}`,
+                                  paddingBottom: "5px",
+                                }}
+                              >
+                                {dataGrupo}
+                              </h4>
+                              <table
+                                style={{
+                                  width: "100%",
+                                  borderCollapse: "collapse",
+                                }}
+                              >
+                                <tbody>
+                                  {itensDoGrupo.map((t_row, i) => {
+                                    const isExpense = t_row.type === "EXPENSE";
+                                    const infoExibicao = getValorExibicao(
+                                      Math.abs(t_row.amount || 0),
+                                    );
+                                    const categoriaVisual =
+                                      categoryMap[t_row.category || "OTHER"] ||
+                                      categoryMap["OTHER"];
+                                    const isOutros =
+                                      !t_row.category ||
+                                      t_row.category === "OTHER";
+                                    const corDeFundoIcone = isOutros
+                                      ? isExpense
+                                        ? isDarkMode
+                                          ? "#4a1c1c"
+                                          : "#ffebee"
+                                        : isDarkMode
+                                          ? "#1b3320"
+                                          : "#e8f5e9"
+                                      : categoriaVisual.bgColor;
+
+                                    return (
+                                      <tr
+                                        key={t_row.id || i}
+                                        style={{
+                                          borderBottom: `1px solid ${theme.border}`,
+                                        }}
+                                      >
+                                        <td
+                                          style={{
+                                            padding: "14px 0",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "15px",
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              width: "40px",
+                                              height: "40px",
+                                              borderRadius: "10px",
+                                              backgroundColor: corDeFundoIcone,
+                                              display: "flex",
+                                              justifyContent: "center",
+                                              alignItems: "center",
+                                              fontSize: "1.2rem",
+                                            }}
+                                            title={categoriaVisual[idioma]}
+                                          >
+                                            {categoriaVisual.emoji}
+                                          </div>
+                                          <div>
+                                            <div
+                                              style={{
+                                                fontWeight: "500",
+                                                color: theme.textMain,
+                                                fontSize: "0.95rem",
+                                              }}
+                                            >
+                                              {t_row.description}
+                                            </div>
+                                            <div
+                                              style={{
+                                                color: theme.textMuted,
+                                                fontSize: "0.75rem",
+                                                marginTop: "4px",
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  color: isExpense
+                                                    ? theme.red
+                                                    : theme.green,
+                                                  fontWeight: "bold",
+                                                  marginRight: "6px",
+                                                }}
+                                              >
+                                                {categoriaVisual[idioma]}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td
+                                          style={{
+                                            padding: "14px 0",
+                                            textAlign: "right",
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              fontWeight: "600",
+                                              color: isExpense
+                                                ? theme.red
+                                                : theme.green,
+                                              fontSize: "0.95rem",
+                                            }}
+                                          >
+                                            {isExpense ? "- " : "+ "}{" "}
+                                            {infoExibicao.simbolo}{" "}
+                                            {infoExibicao.valorFormatado}
+                                          </div>
+                                        </td>
+                                        <td
+                                          style={{
+                                            width: "40px",
+                                            textAlign: "right",
+                                          }}
+                                        >
+                                          <button
+                                            onClick={() =>
+                                              handleDeleteTransaction(t_row.id)
+                                            }
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: theme.textMuted,
+                                              cursor: "pointer",
+                                              fontSize: "1.2rem",
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -3404,10 +4184,6 @@ const translations = {
       es: "Espanhol",
       fr: "Francês",
       de: "Alemão",
-      it: "Italiano",
-      ja: "Japonês",
-      zh: "Chinês",
-      ko: "Coreano",
     },
     title: "GlobalWallet",
     subtitle: "Seu controle financeiro",
@@ -3444,8 +4220,12 @@ const translations = {
     cancel: "Cancelar",
     save: "Salvar",
     accountBalance: "Saldo em Conta",
+    balanceOption: "Saldo em Conta", // Nova chave para o select
     descriptionLabel: "Descrição",
     valueLabel: "Valor",
+    dateLabel: "Data",
+    entireMonth: "Mês Inteiro",
+    back: "Voltar",
     paymentHistoryLabel: "Forma de Pagamento",
     receiptMethodLabel: "Forma de Recebimento",
     transferLabel: "Transferência",
@@ -3471,6 +4251,9 @@ const translations = {
       "Erro ao trocar senha. Verifique se a senha atual está correta.",
     languageTitle: "Idioma",
     languageDesc: "Altera o idioma de toda a aplicação.",
+    all: "Todos",
+    received: "Recebidos",
+    sent: "Enviados",
     months: [
       "Janeiro",
       "Fevereiro",
@@ -3494,10 +4277,6 @@ const translations = {
       es: "Spanish",
       fr: "French",
       de: "German",
-      it: "Italian",
-      ja: "Japanese",
-      zh: "Chinese",
-      ko: "Korean",
     },
     title: "GlobalWallet",
     subtitle: "Your financial control",
@@ -3536,8 +4315,12 @@ const translations = {
     cancel: "Cancel",
     save: "Save",
     accountBalance: "Account Balance",
+    balanceOption: "Account Balance", // Nova chave para o select
     descriptionLabel: "Description",
     valueLabel: "Value",
+    dateLabel: "Date",
+    entireMonth: "Entire Month",
+    back: "Back",
     paymentHistoryLabel: "Payment Method",
     receiptMethodLabel: "Receipt Method",
     transferLabel: "Bank Transfer",
@@ -3564,6 +4347,9 @@ const translations = {
       "Error changing password. Please check if your current password is correct.",
     languageTitle: "Language",
     languageDesc: "Change the application language.",
+    all: "All",
+    received: "Received",
+    sent: "Sent",
     months: [
       "January",
       "February",
@@ -3587,10 +4373,6 @@ const translations = {
       es: "Español",
       fr: "Francés",
       de: "Alemán",
-      it: "Italiano",
-      ja: "Japonés",
-      zh: "Chino",
-      ko: "Coreano",
     },
     title: "GlobalWallet",
     subtitle: "Tu control financiero",
@@ -3629,8 +4411,12 @@ const translations = {
     cancel: "Cancelar",
     save: "Guardar",
     accountBalance: "Saldo en Cuenta",
+    balanceOption: "Saldo en Cuenta", // Nova chave para o select
     descriptionLabel: "Descripción",
     valueLabel: "Valor",
+    dateLabel: "Fecha",
+    entireMonth: "Mes Entero",
+    back: "Atrás",
     paymentHistoryLabel: "Método de Pago",
     receiptMethodLabel: "Forma de Cobro",
     transferLabel: "Transferencia",
@@ -3656,6 +4442,9 @@ const translations = {
       "Error al cambiar la contraseña. Verifica si tu contraseña actual es correcta.",
     languageTitle: "Idioma",
     languageDesc: "Cambiar el idioma de la aplicación.",
+    all: "Todos",
+    received: "Recibidos",
+    sent: "Enviados",
     months: [
       "Enero",
       "Febrero",
@@ -3679,10 +4468,6 @@ const translations = {
       es: "Espagnol",
       fr: "Français",
       de: "Allemand",
-      it: "Italien",
-      ja: "Japonais",
-      zh: "Chinois",
-      ko: "Coréen",
     },
     title: "GlobalWallet",
     subtitle: "Votre contrôle financier",
@@ -3721,8 +4506,12 @@ const translations = {
     cancel: "Annuler",
     save: "Sauvegarder",
     accountBalance: "Solde du Compte",
+    balanceOption: "Solde du Compte", // Nova chave para o select
     descriptionLabel: "Description",
     valueLabel: "Valeur",
+    dateLabel: "Date",
+    entireMonth: "Mois Entier",
+    back: "Retour",
     paymentHistoryLabel: "Méthode de Paiement",
     receiptMethodLabel: "Méthode d'Encaissement",
     transferLabel: "Virement",
@@ -3749,6 +4538,9 @@ const translations = {
       "Erreur lors du changement. Vérifiez votre mot de passe actuel.",
     languageTitle: "Langue",
     languageDesc: "Changer la langue de l'application.",
+    all: "Tous",
+    received: "Reçus",
+    sent: "Envoyés",
     months: [
       "Janvier",
       "Février",
@@ -3760,7 +4552,7 @@ const translations = {
       "Août",
       "Septembre",
       "Octubre",
-      "Novembre",
+      "Novembro",
       "Décembre",
     ],
   },
@@ -3772,10 +4564,6 @@ const translations = {
       es: "Spanisch",
       fr: "Französisch",
       de: "Deutsch",
-      it: "Italienisch",
-      ja: "Japanisch",
-      zh: "Chinesisch",
-      ko: "Koreanisch",
     },
     title: "GlobalWallet",
     subtitle: "Ihre Finanzkontrolle",
@@ -3814,8 +4602,12 @@ const translations = {
     cancel: "Abbrechen",
     save: "Speichern",
     accountBalance: "Kontostand",
+    balanceOption: "Kontostand", // Nova chave para o select
     descriptionLabel: "Beschreibung",
     valueLabel: "Wert",
+    dateLabel: "Datum",
+    entireMonth: "Ganzer Monat",
+    back: "Zurück",
     paymentHistoryLabel: "Zahlungsmethode",
     receiptMethodLabel: "Empfangsmethode",
     transferLabel: "Überweisung",
@@ -3842,6 +4634,9 @@ const translations = {
       "Fehler beim Ändern. Überprüfen Sie Ihr aktuelles Passwort.",
     languageTitle: "Sprache",
     languageDesc: "Ändern Sie die Sprache der Anwendung.",
+    all: "Alle",
+    received: "Erhalten",
+    sent: "Gesendet",
     months: [
       "Januar",
       "Februar",
@@ -3857,372 +4652,6 @@ const translations = {
       "Dezember",
     ],
   },
-  it: {
-    flag: "🇮🇹",
-    langs: {
-      pt: "Portoghese",
-      en: "Inglese",
-      es: "Spagnolo",
-      fr: "Francese",
-      de: "Tedesco",
-      it: "Italiano",
-      ja: "Giapponese",
-      zh: "Cinese",
-      ko: "Coreano",
-    },
-    title: "GlobalWallet",
-    subtitle: "Il tuo controle",
-    home: "Inizio",
-    statement: "Estratto",
-    cards: "Le Mie Carte",
-    settings: "Impostazioni",
-    welcome: "Ciao",
-    logout: "Esci",
-    balance: "Saldo Disponibile",
-    newTransaction: "Nuova Transazione",
-    income: "Entrata",
-    expense: "Uscita",
-    descPlaceholder: "Es: Mercato",
-    valPlaceholder: "0,00",
-    btnRegister: "Registra",
-    history: "Ultime Transazioni",
-    noTransactions: "Nessuna transazione.",
-    confirmDelete: "Eliminare?",
-    errorValue: "Valore non valido.",
-    selCategory: "Categoria",
-    entries: "Entrate",
-    exits: "Uscite",
-    balanceTotal: "Bilancio",
-    periodTransactions: "Transazioni del Periodo",
-    noTransactionsMonth: "Nessuna transazione trovata in questo mese.",
-    newCard: "+ Nuova Carta",
-    currentInvoice: "Fatura Attuale",
-    availableLimit: "Limite Disp.",
-    cardEnding: "Termina con",
-    modalCardTitle: "Aggiungi Nuova Carta",
-    cardNamePlaceholder: "Nome (es: Nubank)",
-    cardEndPlaceholder: "Termina con (es: 4321)",
-    cardLimitPlaceholder: "Limite (€)",
-    cardColor: "Colore Carta",
-    cancel: "Annulla",
-    save: "Salva",
-    accountBalance: "Saldo in Conto",
-    descriptionLabel: "Descrizione",
-    valueLabel: "Valore",
-    paymentHistoryLabel: "Metodo di Pagamento",
-    receiptMethodLabel: "Metodo di Ricezione",
-    transferLabel: "Bonifico",
-    profileTitle: "Il Mio Profilo",
-    fullNameLabel: "Nome Completo",
-    emailLabel: "E-mail",
-    phoneLabel: "Telefono",
-    profileDesc:
-      "Dati personali collegati. Per modifiche, contattare il supporto.",
-    appearanceTitle: "Aspetto",
-    darkModeLabel: "Modalità Scura",
-    darkModeDesc: "Modifica il tema visivo dell'applicazione.",
-    securityTitle: "Sicurezza",
-    currentPassword: "Password Attuale",
-    newPassword: "Nuova Password",
-    confirmNewPassword: "Conferma Nuova Password",
-    updatePassword: "Aggiorna Password",
-    errorSamePassword:
-      "La nuova password deve essere diversa da quella attuale.",
-    errorMismatch: "Le nuove password non corrispondono.",
-    errorShortPassword: "La password deve contenere almeno 6 caratteri.",
-    successPasswordUpdate: "Password aggiornata con successo!",
-    errorPasswordUpdate:
-      "Errore. Verifica se la tua password attuale è corretta.",
-    languageTitle: "Lingua",
-    languageDesc: "Cambia la lingua dell'applicazione.",
-    months: [
-      "Gennaio",
-      "Febbraio",
-      "Marzo",
-      "Aprile",
-      "Maggio",
-      "Giugno",
-      "Luglio",
-      "Agosto",
-      "Settembre",
-      "Ottobre",
-      "Novembre",
-      "Dicembre",
-    ],
-  },
-  ja: {
-    flag: "🇯🇵",
-    langs: {
-      pt: "ポルトガル語",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "韓国語",
-    },
-    title: "GlobalWallet",
-    subtitle: "財務管理",
-    home: "ホーム",
-    statement: "明細",
-    cards: "カード",
-    settings: "設定",
-    welcome: "こんにちは",
-    logout: "ログアウト",
-    balance: "利用可能残高",
-    newTransaction: "新規取引",
-    income: "収入",
-    expense: "支出",
-    descPlaceholder: "例: スーパー",
-    valPlaceholder: "0.00",
-    btnRegister: "登録",
-    history: "最近の取引",
-    noTransactions: "取引はまだありません。",
-    confirmDelete: "削除しますか？",
-    errorValue: "無効な値です。",
-    selCategory: "カテゴリ",
-    entries: "収入",
-    exits: "支出",
-    balanceTotal: "残高",
-    periodTransactions: "期間の取引",
-    noTransactionsMonth: "今月の取引は見つかりませんでした。",
-    newCard: "+ 新しいカード",
-    currentInvoice: "現在の請求額",
-    availableLimit: "利用可能枠",
-    cardEnding: "末尾",
-    modalCardTitle: "新しいカードを追加",
-    cardNamePlaceholder: "名前 (例: Nubank)",
-    cardEndPlaceholder: "末尾 (例: 4321)",
-    cardLimitPlaceholder: "限度額 (¥)",
-    cardColor: "カードの色",
-    cancel: "キャンセル",
-    save: "保存",
-    accountBalance: "口座残高",
-    descriptionLabel: "説明",
-    valueLabel: "価値",
-    paymentHistoryLabel: "支払方法",
-    receiptMethodLabel: "受取方法",
-    transferLabel: "振込",
-    profileTitle: "マイプロフィール",
-    fullNameLabel: "フルネーム",
-    emailLabel: "メール",
-    phoneLabel: "電話番号",
-    profileDesc:
-      "アカウントに関連付けられた個人データです。変更についてはサポートにお問い合わせください。",
-    appearanceTitle: "外観",
-    darkModeLabel: "ダークモード",
-    darkModeDesc: "アプリの視覚テーマを変更します。",
-    securityTitle: "セキュリティ",
-    currentPassword: "現在のパスワード",
-    newPassword: "新しいパスワード",
-    confirmNewPassword: "新しいパスワードの確認",
-    updatePassword: "パスワードを更新",
-    errorSamePassword:
-      "新しいパスワードは現在のパスワードと異なる必要があります。",
-    errorMismatch: "新しいパスワードが一致しません。",
-    errorShortPassword: "パスワードは6文字以上にする必要があります。",
-    successPasswordUpdate: "パスワードが正常に更新されました！",
-    errorPasswordUpdate: "エラー。現在のパスワードが正しいか確認してください。",
-    languageTitle: "言語",
-    languageDesc: "アプリケーションの言語を変更します。",
-    months: [
-      "1月",
-      "2月",
-      "3月",
-      "4月",
-      "5月",
-      "6月",
-      "7月",
-      "8月",
-      "9月",
-      "10月",
-      "11月",
-      "12月",
-    ],
-  },
-  zh: {
-    flag: "🇨🇳",
-    langs: {
-      pt: "葡萄牙语",
-      en: "英语",
-      es: "西班牙语",
-      fr: "法语",
-      de: "德语",
-      it: "意大利语",
-      ja: "日语",
-      zh: "中文",
-      ko: "韩语",
-    },
-    title: "GlobalWallet",
-    subtitle: "你的财务控制",
-    home: "首页",
-    statement: "声明",
-    cards: "我的卡",
-    settings: "设置",
-    welcome: "你好",
-    logout: "退出",
-    balance: "可用余额",
-    newTransaction: "新交易",
-    income: "收入",
-    expense: "支出",
-    descPlaceholder: "例: 超市",
-    valPlaceholder: "0.00",
-    btnRegister: "注册",
-    history: "最近交易",
-    noTransactions: "暂无交易。",
-    confirmDelete: "删除交易？",
-    errorValue: "无效值。",
-    selCategory: "类别",
-    entries: "收入",
-    exits: "支出",
-    balanceTotal: "余额",
-    periodTransactions: "期间交易",
-    noTransactionsMonth: "本月未找到交易。",
-    newCard: "+ 新卡",
-    currentInvoice: "当前账单",
-    availableLimit: "可用额度",
-    cardEnding: "尾号",
-    modalCardTitle: "添加新卡",
-    cardNamePlaceholder: "名称 (例: Nubank)",
-    cardEndPlaceholder: "尾号 (例: 4321)",
-    cardLimitPlaceholder: "额度 (¥)",
-    cardColor: "卡片颜色",
-    cancel: "取消",
-    save: "保存",
-    accountBalance: "账户余额",
-    descriptionLabel: "描述",
-    valueLabel: "价值",
-    paymentHistoryLabel: "支付方式",
-    receiptMethodLabel: "收款方式",
-    transferLabel: "转账",
-    profileTitle: "我的资料",
-    fullNameLabel: "全名",
-    emailLabel: "电子邮件",
-    phoneLabel: "电话号码",
-    profileDesc: "与您的注册相关的个人数据。如需修改，请联系支持。",
-    appearanceTitle: "外观",
-    darkModeLabel: "深色模式",
-    darkModeDesc: "更改应用程序的视觉主题。",
-    securityTitle: "安全",
-    currentPassword: "当前密码",
-    newPassword: "新密码",
-    confirmNewPassword: "确认新密码",
-    updatePassword: "更新密码",
-    errorSamePassword: "新密码必须与当前密码不同。",
-    errorMismatch: "新密码不匹配。",
-    errorShortPassword: "密码必须至少有 6 个字符。",
-    successPasswordUpdate: "密码更新成功！",
-    errorPasswordUpdate: "更改错误。请检查当前密码。",
-    languageTitle: "语言",
-    languageDesc: "更改应用程序语言。",
-    months: [
-      "一月",
-      "二月",
-      "三月",
-      "四月",
-      "五月",
-      "六月",
-      "七月",
-      "八月",
-      "九月",
-      "十月",
-      "十一月",
-      "十二月",
-    ],
-  },
-  ko: {
-    flag: "🇰🇷",
-    langs: {
-      pt: "포르투갈어",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "한국어",
-    },
-    title: "GlobalWallet",
-    subtitle: "귀하의 재정 관리",
-    home: "홈",
-    statement: "명세서",
-    cards: "내 카드",
-    settings: "설정",
-    welcome: "안녕하세요",
-    logout: "로그아웃",
-    balance: "사용 가능 잔액",
-    newTransaction: "새 거래",
-    income: "수입",
-    expense: "지출",
-    descPlaceholder: "예: 마트",
-    valPlaceholder: "0.00",
-    btnRegister: "등록",
-    history: "최근 거래",
-    noTransactions: "아직 거래가 없습니다.",
-    confirmDelete: "삭제하시겠습니까?",
-    errorValue: "잘못된 값입니다.",
-    selCategory: "카테고리",
-    entries: "수입",
-    exits: "지출",
-    balanceTotal: "잔액",
-    periodTransactions: "기간 거래",
-    noTransactionsMonth: "이번 달에 거래가 없습니다.",
-    newCard: "+ 새 카드",
-    currentInvoice: "현재 청구서",
-    availableLimit: "사용 가능 한도",
-    cardEnding: "끝자리",
-    modalCardTitle: "새 카드 추가",
-    cardNamePlaceholder: "이름 (예: Nubank)",
-    cardEndPlaceholder: "끝자리 (예: 4321)",
-    cardLimitPlaceholder: "한도 (₩)",
-    cardColor: "카드 색상",
-    cancel: "취소",
-    save: "저장",
-    accountBalance: "계좌 잔액",
-    descriptionLabel: "설명",
-    valueLabel: "가치",
-    paymentHistoryLabel: "결제 방법",
-    receiptMethodLabel: "수취 방법",
-    transferLabel: "계좌 이체",
-    profileTitle: "내 프로필",
-    fullNameLabel: "성명",
-    emailLabel: "이메일",
-    phoneLabel: "전화번호",
-    profileDesc:
-      "귀하의 계정과 연결된 개인 데이터입니다. 수정을 원하시면 지원팀에 문의하십시오.",
-    appearanceTitle: "모양",
-    darkModeLabel: "다크 모드",
-    darkModeDesc: "앱의 시각적 테마를 변경합니다.",
-    securityTitle: "보안",
-    currentPassword: "현재 비밀번호",
-    newPassword: "새 비밀번호",
-    confirmNewPassword: "새 비밀번호 확인",
-    updatePassword: "비밀번호 업데이트",
-    errorSamePassword: "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
-    errorMismatch: "새 비밀번호가 일치하지 않습니다.",
-    errorShortPassword: "비밀번호는 6자 이상이어야 합니다.",
-    successPasswordUpdate: "비밀번호가 성공적으로 업데이트되었습니다!",
-    errorPasswordUpdate: "변경 오류. 현재 비밀번호를 확인하십시오.",
-    languageTitle: "언어",
-    languageDesc: "애플리케이션 언어를 변경합니다.",
-    months: [
-      "1월",
-      "2월",
-      "3월",
-      "4월",
-      "5월",
-      "6월",
-      "7월",
-      "8월",
-      "9월",
-      "10월",
-      "11월",
-      "12월",
-    ],
-  },
 };
 
 const categoryMap: Record<
@@ -4233,10 +4662,6 @@ const categoryMap: Record<
     es: string;
     fr: string;
     de: string;
-    it: string;
-    ja: string;
-    zh: string;
-    ko: string;
     emoji: string;
     color: string;
     bgColor: string;
@@ -4248,10 +4673,6 @@ const categoryMap: Record<
     es: "Salario",
     fr: "Salaire",
     de: "Gehalt",
-    it: "Stipendio",
-    ja: "給与",
-    zh: "工资",
-    ko: "급여",
     emoji: "💰",
     color: "#2e7d32",
     bgColor: "#e8f5e9",
@@ -4262,13 +4683,19 @@ const categoryMap: Record<
     es: "Ventas",
     fr: "Ventes",
     de: "Verkäufe",
-    it: "Vendite",
-    ja: "売上",
-    zh: "销售",
-    ko: "판매",
     emoji: "🛍️",
     color: "#0277bd",
     bgColor: "#e3f2fd",
+  },
+  INVESTMENTS: {
+    pt: "Investimentos",
+    en: "Investments",
+    es: "Inversiones",
+    fr: "Investissements",
+    de: "Investitionen",
+    emoji: "📈",
+    color: "#fbc02d",
+    bgColor: "#fffde7",
   },
   FOOD: {
     pt: "Alimentação",
@@ -4276,10 +4703,6 @@ const categoryMap: Record<
     es: "Alimentación",
     fr: "Alimentation",
     de: "Essen",
-    it: "Cibo",
-    ja: "食事",
-    zh: "食物",
-    ko: "음식",
     emoji: "🍔",
     color: "#e65100",
     bgColor: "#fff3e0",
@@ -4290,10 +4713,6 @@ const categoryMap: Record<
     es: "Mercado",
     fr: "Marché",
     de: "Markt",
-    it: "Mercato",
-    ja: "市場",
-    zh: "市场",
-    ko: "시장",
     emoji: "🛒",
     color: "#d84315",
     bgColor: "#fbe9e7",
@@ -4304,10 +4723,6 @@ const categoryMap: Record<
     es: "Transporte",
     fr: "Transport",
     de: "Transport",
-    it: "Trasporto",
-    ja: "交通",
-    zh: "交通",
-    ko: "교통",
     emoji: "🚌",
     color: "#1565c0",
     bgColor: "#e3f2fd",
@@ -4318,10 +4733,6 @@ const categoryMap: Record<
     es: "Entretenimiento",
     fr: "Loisirs",
     de: "Freizeit",
-    it: "Svago",
-    ja: "娯楽",
-    zh: "娱乐",
-    ko: "오락",
     emoji: "🍿",
     color: "#6a1b9a",
     bgColor: "#f3e5f5",
@@ -4332,10 +4743,6 @@ const categoryMap: Record<
     es: "Cuentas",
     fr: "Factures",
     de: "Rechnungen",
-    it: "Bollette",
-    ja: "請求書",
-    zh: "账单",
-    ko: "청구서",
     emoji: "📄",
     color: "#00695c",
     bgColor: "#e0f2f1",
@@ -4346,10 +4753,6 @@ const categoryMap: Record<
     es: "Otros",
     fr: "Autres",
     de: "Andere",
-    it: "Altro",
-    ja: "その他",
-    zh: "其他",
-    ko: "기타",
     emoji: "📌",
     color: "#616161",
     bgColor: "#f5f5f5",

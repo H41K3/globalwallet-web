@@ -4,7 +4,7 @@ import axios from "axios";
 
 import bgImg from "../assets/loginbackground.png";
 
-type IdiomaType = "pt" | "en" | "es" | "fr" | "de" | "it" | "ja" | "zh" | "ko";
+type IdiomaType = "pt" | "en" | "es" | "fr" | "de";
 
 const AppLogo = ({ size = 45 }: { size?: number }) => (
   <div
@@ -370,7 +370,7 @@ export function Login() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  WebkitUserSelect: "none", // Previne seleção no mobile
+                  WebkitUserSelect: "none",
                   userSelect: "none",
                   WebkitTapHighlightColor: "transparent",
                 }}
@@ -379,7 +379,7 @@ export function Login() {
                 onMouseLeave={() => setIsPasswordVisible(false)}
                 onTouchStart={() => setIsPasswordVisible(true)}
                 onTouchEnd={() => setIsPasswordVisible(false)}
-                onContextMenu={(e) => e.preventDefault()} // Previne o menu de opções ao segurar o toque
+                onContextMenu={(e) => e.preventDefault()}
               >
                 {isPasswordVisible ? <EyeIcon /> : <EyeSlashIcon />}
               </button>
@@ -432,10 +432,6 @@ const translations = {
       es: "Espanhol",
       fr: "Francês",
       de: "Alemão",
-      it: "Italiano",
-      ja: "Japonês",
-      zh: "Chinês",
-      ko: "Coreano",
     },
     title: "GlobalWallet",
     cpfLabel: "CPF",
@@ -453,10 +449,6 @@ const translations = {
       es: "Spanish",
       fr: "French",
       de: "German",
-      it: "Italian",
-      ja: "Japanese",
-      zh: "Chinese",
-      ko: "Korean",
     },
     title: "GlobalWallet",
     cpfLabel: "ID / CPF",
@@ -474,10 +466,6 @@ const translations = {
       es: "Español",
       fr: "Francés",
       de: "Alemán",
-      it: "Italiano",
-      ja: "Japonés",
-      zh: "Chino",
-      ko: "Coreano",
     },
     title: "GlobalWallet",
     cpfLabel: "Identificación / CPF",
@@ -495,10 +483,6 @@ const translations = {
       es: "Espagnol",
       fr: "Français",
       de: "Allemand",
-      it: "Italien",
-      ja: "Japonais",
-      zh: "Chinois",
-      ko: "Coréen",
     },
     title: "GlobalWallet",
     cpfLabel: "ID / CPF",
@@ -516,10 +500,6 @@ const translations = {
       es: "Spanisch",
       fr: "Französisch",
       de: "Deutsch",
-      it: "Italienisch",
-      ja: "Japanisch",
-      zh: "Chinesisch",
-      ko: "Koreanisch",
     },
     title: "GlobalWallet",
     cpfLabel: "Ausweis / CPF",
@@ -528,89 +508,5 @@ const translations = {
     noAccount: "Haben Sie kein Konto?",
     registerLink: "Registrieren",
     errorInvalid: "Ungültige ID oder Passwort.",
-  },
-  it: {
-    flag: "🇮🇹",
-    langs: {
-      pt: "Portoghese",
-      en: "Inglese",
-      es: "Spagnolo",
-      fr: "Francese",
-      de: "Tedesco",
-      it: "Italiano",
-      ja: "Giapponese",
-      zh: "Cinese",
-      ko: "Coreano",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "Documento / CPF",
-    passwordLabel: "Password",
-    loginBtn: "Accedi",
-    noAccount: "Non hai un account?",
-    registerLink: "Iscriviti",
-    errorInvalid: "ID o password non validi.",
-  },
-  ja: {
-    flag: "🇯🇵",
-    langs: {
-      pt: "ポルトガル語",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "韓国語",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "身分証明書 / CPF",
-    passwordLabel: "パスワード",
-    loginBtn: "ログイン",
-    noAccount: "アカウントをお持ちではありませんか？",
-    registerLink: "登録",
-    errorInvalid: "無効なIDまたはパスワードです。",
-  },
-  zh: {
-    flag: "🇨🇳",
-    langs: {
-      pt: "葡萄牙语",
-      en: "英语",
-      es: "西班牙语",
-      fr: "法语",
-      de: "德语",
-      it: "意大利语",
-      ja: "日语",
-      zh: "中文",
-      ko: "韩语",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "身份证 / CPF",
-    passwordLabel: "密码",
-    loginBtn: "登录",
-    noAccount: "没有账号？",
-    registerLink: "注册",
-    errorInvalid: "ID或密码无效。",
-  },
-  ko: {
-    flag: "🇰🇷",
-    langs: {
-      pt: "포르투갈어",
-      en: "英語",
-      es: "スペイン語",
-      fr: "フランス語",
-      de: "ドイツ語",
-      it: "イタリア語",
-      ja: "日本語",
-      zh: "中国語",
-      ko: "한국어",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "신분증 / CPF",
-    passwordLabel: "비밀번호",
-    loginBtn: "로그인",
-    noAccount: "계정이 없으신가요?",
-    registerLink: "가입하기",
-    errorInvalid: "유효하지 않은 ID 또는 비밀번호입니다.",
   },
 };
