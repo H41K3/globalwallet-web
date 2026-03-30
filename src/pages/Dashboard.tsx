@@ -25,6 +25,8 @@ interface Cartao {
   currentInvoice: number;
   cor?: string;
   color?: string;
+  bandeira?: string; // Preparado para o Backend
+  flag?: string; // Preparado para o Backend (em inglês)
 }
 
 type ThemeType = {
@@ -41,6 +43,103 @@ type ThemeType = {
   shadow: string;
   green: string;
   red: string;
+};
+
+// ==========================================
+// PRESETS DE CARTÕES E BANDEIRAS
+// ==========================================
+const PRESET_CARDS = [
+  { name: "Nubank", color: "#8A05BE" },
+  { name: "Itaú", color: "#EC7000" },
+  { name: "Bradesco", color: "#CC092F" },
+  { name: "Santander", color: "#EC0000" },
+  { name: "Banco do Brasil", color: "#F9D308" },
+  { name: "Caixa", color: "#005CA9" },
+  { name: "Inter", color: "#FF7A00" },
+  { name: "C6 Bank", color: "#242424" },
+  { name: "XP", color: "#000000" },
+  { name: "Personalizado", color: "#616161" },
+];
+
+const ChipSVG = () => (
+  <svg
+    width="35"
+    height="25"
+    viewBox="0 0 35 25"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect width="35" height="25" rx="4" fill="#D4AF37" />
+    <path d="M5 0V25M30 0V25M0 12.5H35" stroke="#B8860B" strokeWidth="1.5" />
+    <rect
+      x="10"
+      y="5"
+      width="15"
+      height="15"
+      rx="2"
+      stroke="#B8860B"
+      strokeWidth="1.5"
+    />
+  </svg>
+);
+
+const MastercardSVG = () => (
+  <svg
+    width="40"
+    height="24"
+    viewBox="0 0 40 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle cx="15" cy="12" r="12" fill="#EB001B" />
+    <circle cx="25" cy="12" r="12" fill="#F79E1B" />
+    <path
+      d="M20 23.3C22.6 21 24.5 17.6 24.5 12C24.5 6.4 22.6 3 20 0.7C17.4 3 15.5 6.4 15.5 12C15.5 17.6 17.4 21 20 23.3Z"
+      fill="#FF5F00"
+    />
+  </svg>
+);
+
+const VisaSVG = () => (
+  <div
+    style={{
+      color: "white",
+      fontSize: "18px",
+      fontWeight: "900",
+      fontStyle: "italic",
+      fontFamily: "'Arial Black', Impact, sans-serif",
+      letterSpacing: "-1px",
+      filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))",
+      flexShrink: 0,
+      lineHeight: 1,
+      userSelect: "none",
+    }}
+  >
+    VISA
+  </div>
+);
+
+// Função Inteligente para Renderizar a Bandeira Correta
+const renderBandeira = (cartao: Cartao) => {
+  // 1º Tenta usar a bandeira que veio do banco de dados
+  const flagDB = cartao.bandeira?.toLowerCase() || cartao.flag?.toLowerCase();
+
+  // 2º Se não tiver no DB ainda, tenta adivinhar pelo nome do cartão
+  const nomeBanco = (cartao.nome || cartao.name || "").toLowerCase();
+
+  if (
+    flagDB === "visa" ||
+    (!flagDB &&
+      (nomeBanco.includes("brasil") ||
+        nomeBanco.includes("bradesco") ||
+        nomeBanco.includes("xp") ||
+        nomeBanco.includes("visa")))
+  ) {
+    return <VisaSVG />;
+  }
+
+  // Default / Fallback
+  return <MastercardSVG />;
 };
 
 // ==========================================
@@ -2968,7 +3067,7 @@ export function Dashboard() {
                         <span
                           style={{ fontSize: "0.9rem", fontWeight: "bold" }}
                         >
-                          {group.transactions.length} transações
+                          {group.transactions.length} {t.transactionsCount}
                         </span>
                         <span
                           style={{
@@ -3307,19 +3406,29 @@ export function Dashboard() {
                   cursor: "pointer",
                   fontSize: "0.9rem",
                   boxShadow: "0 4px 10px rgba(217,22,22,0.2)",
+                  transition: "transform 0.2s",
                 }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.transform = "scale(1.05)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.transform = "scale(1)")
+                }
               >
                 {t.newCard}
               </button>
             </div>
 
+            {/* Contêiner da Grade de Cartões */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "35px",
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : "repeat(auto-fit, minmax(260px, 280px))",
+                gap: "25px",
                 width: "100%",
-                maxWidth: "650px",
+                maxWidth: "750px",
                 justifyContent: "center",
               }}
             >
@@ -3335,195 +3444,242 @@ export function Dashboard() {
                   Nenhum cartão cadastrado ainda.
                 </p>
               )}
-              {cartoes.map((cartao) => (
-                <div
-                  key={cartao.id}
-                  style={{
-                    backgroundColor: cartao.cor || cartao.color || "#333",
-                    color: "white",
-                    padding: "1.2rem",
-                    borderRadius: "14px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "15px",
-                    position: "relative",
-                    overflow: "hidden",
-                    aspectRatio: "1.58 / 1",
-                    width: "280px",
-                    margin: "0 auto",
-                    boxSizing: "border-box",
-                  }}
-                >
+              {cartoes.map((cartao) => {
+                const percUsado =
+                  cartao.totalLimit > 0
+                    ? ((cartao.currentInvoice || 0) / cartao.totalLimit) * 100
+                    : 0;
+
+                return (
                   <div
+                    key={cartao.id}
                     style={{
-                      position: "absolute",
-                      top: "-40%",
-                      right: "-15%",
-                      width: "150px",
-                      height: "150px",
-                      backgroundColor: "rgba(255,255,255,0.08)",
-                      borderRadius: "50%",
-                      transform: "rotate(25deg)",
-                    }}
-                  />
-                  <button
-                    onClick={() => handleDeleteCartao(cartao.id)}
-                    style={{
-                      position: "absolute",
-                      top: "10px",
-                      right: "10px",
-                      background: "transparent",
-                      border: "none",
+                      backgroundColor: cartao.cor || cartao.color || "#333",
                       color: "white",
-                      fontSize: "1.2rem",
+                      padding: "1.2rem",
+                      borderRadius: "14px",
+                      boxShadow: "0 6px 15px rgba(0,0,0,0.3)",
+                      display: "flex",
+                      flexDirection: "column",
+                      position: "relative",
+                      overflow: "hidden",
+                      aspectRatio: "1.58 / 1",
+                      width: "100%",
+                      margin: "0 auto",
+                      boxSizing: "border-box",
+                      transition: "transform 0.3s ease, box-shadow 0.3s ease",
                       cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 10,
-                      opacity: 0.7,
                     }}
-                    title="Excluir Cartão"
-                  >
-                    ×
-                  </button>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      zIndex: 1,
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-5px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 12px 25px rgba(0,0,0,0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "0 6px 15px rgba(0,0,0,0.3)";
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: "1.0rem",
-                        fontWeight: "600",
-                        letterSpacing: "0.5px",
-                      }}
-                    >
-                      {cartao.nome || cartao.name}
-                    </span>
-                    <span style={{ fontSize: "1.2rem", marginRight: "20px" }}>
-                      💳
-                    </span>
-                  </div>
-                  <div style={{ zIndex: 1, marginTop: "5px" }}>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "0.7rem",
-                        opacity: 0.8,
-                        textTransform: "uppercase",
-                        letterSpacing: "1.5px",
-                      }}
-                    >
-                      {t.cardEnding}
-                    </p>
-                    <p
-                      style={{
-                        margin: "2px 0 0 0",
-                        fontSize: "1.1rem",
-                        letterSpacing: "2.5px",
-                      }}
-                    >
-                      **** **** **** {cartao.lastDigits}
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-end",
-                      zIndex: 1,
-                      marginTop: "auto",
-                    }}
-                  >
-                    <div>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "0.65rem",
-                          opacity: 0.8,
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {t.currentInvoice}
-                      </p>
-                      <p
-                        style={{
-                          margin: "1px 0 0 0",
-                          fontSize: "1.0rem",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        R${" "}
-                        {(cartao.currentInvoice || 0).toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
+                    {/* Efeito de brilho de fundo */}
                     <div
                       style={{
-                        textAlign: "right",
+                        position: "absolute",
+                        top: "-40%",
+                        right: "-15%",
+                        width: "130px",
+                        height: "130px",
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                        borderRadius: "50%",
+                        transform: "rotate(25deg)",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    {/* Botão Fechar */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCartao(cartao.id);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        background: "rgba(0,0,0,0.2)",
+                        border: "none",
+                        color: "white",
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "50%",
+                        fontSize: "1rem",
+                        cursor: "pointer",
                         display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-end",
-                        gap: "2px",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10,
+                        transition: "background 0.2s",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "rgba(0,0,0,0.5)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "rgba(0,0,0,0.2)")
+                      }
+                      title="Excluir Cartão"
+                    >
+                      ×
+                    </button>
+
+                    {/* Topo: Nome e Bandeira */}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        zIndex: 1,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "1.05rem",
+                          fontWeight: "bold",
+                          letterSpacing: "1px",
+                          textShadow: "1px 1px 2px rgba(0,0,0,0.3)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: "160px",
+                        }}
+                      >
+                        {cartao.nome || cartao.name}
+                      </span>
+                      <div
+                        style={{
+                          marginRight: "22px",
+                          display: "flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {renderBandeira(cartao)}
+                      </div>
+                    </div>
+
+                    {/* Chip */}
+                    <div style={{ marginTop: "10px", zIndex: 1 }}>
+                      <ChipSVG />
+                    </div>
+
+                    {/* Número do Cartão */}
+                    <div
+                      style={{
+                        zIndex: 1,
+                        marginTop: isMobile ? "6px" : "10px",
+                        flexGrow: 1,
                       }}
                     >
                       <p
                         style={{
                           margin: 0,
-                          fontSize: "0.65rem",
-                          opacity: 0.8,
-                          textTransform: "uppercase",
+                          fontSize: isMobile ? "1.05rem" : "1.15rem", // Fonte levemente menor
+                          letterSpacing: isMobile ? "1.5px" : "2px", // Espaçamento mais enxuto
+                          fontFamily: "monospace",
+                          textShadow: "1px 1px 2px rgba(0,0,0,0.3)",
+                          whiteSpace: "nowrap", // A MÁGICA: proíbe de pular para a linha de baixo!
                         }}
                       >
-                        {t.availableLimit}
+                        **** **** **** {cartao.lastDigits}
                       </p>
-                      <p style={{ margin: 0, fontSize: "0.9rem" }}>
-                        R${" "}
-                        {(
-                          cartao.totalLimit - (cartao.currentInvoice || 0)
-                        ).toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
+                    </div>
+
+                    {/* Rodapé: Fatura, Limite e Barra de Uso */}
+                    <div style={{ zIndex: 1 }}>
                       <div
                         style={{
                           display: "flex",
-                          gap: "1px",
-                          marginTop: "2px",
+                          justifyContent: "space-between",
+                          alignItems: "flex-end",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        <div>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "0.6rem",
+                              opacity: 0.8,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {t.currentInvoice}
+                          </p>
+                          <p
+                            style={{
+                              margin: "2px 0 0 0",
+                              fontSize: "0.95rem",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            R${" "}
+                            {(cartao.currentInvoice || 0).toLocaleString(
+                              "pt-BR",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            )}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "0.6rem",
+                              opacity: 0.8,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {t.availableLimit}
+                          </p>
+                          <p
+                            style={{ margin: "2px 0 0 0", fontSize: "0.85rem" }}
+                          >
+                            R${" "}
+                            {(
+                              cartao.totalLimit - (cartao.currentInvoice || 0)
+                            ).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Barra de Progresso de Uso */}
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "3px",
+                          backgroundColor: "rgba(255,255,255,0.3)",
+                          borderRadius: "2px",
+                          overflow: "hidden",
                         }}
                       >
                         <div
                           style={{
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "#d91616",
-                            opacity: 0.8,
+                            height: "100%",
+                            width: `${Math.min(percUsado, 100)}%`,
+                            backgroundColor:
+                              percUsado > 90 ? "#ff4d4d" : "#fff",
+                            transition: "width 0.5s ease-in-out",
                           }}
-                        ></div>
-                        <div
-                          style={{
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "#F79E1B",
-                            marginLeft: "-6px",
-                            opacity: 0.8,
-                          }}
-                        ></div>
+                        />
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -4011,9 +4167,11 @@ export function Dashboard() {
               padding: "2rem",
               borderRadius: "20px",
               width: "90%",
-              maxWidth: "400px",
+              maxWidth: "450px",
               boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
               boxSizing: "border-box",
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
             <h3
@@ -4026,88 +4184,204 @@ export function Dashboard() {
             >
               {t.modalCardTitle}
             </h3>
+
+            {/* PRESETS DE CARTÕES */}
+            <div style={{ marginBottom: "20px" }}>
+              <p
+                style={{
+                  margin: "0 0 10px 0",
+                  fontSize: "0.85rem",
+                  color: theme.textMuted,
+                  fontWeight: "600",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t.chooseModel}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {PRESET_CARDS.map((preset) => {
+                  const isSelected =
+                    novoCartaoNome === preset.name &&
+                    novoCartaoCor === preset.color;
+                  const displayName =
+                    preset.name === "Personalizado" ? t.custom : preset.name;
+                  return (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => {
+                        setNovoCartaoNome(
+                          preset.name === "Personalizado" ? "" : preset.name,
+                        );
+                        setNovoCartaoCor(preset.color);
+                      }}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "20px",
+                        border: `1px solid ${isSelected ? preset.color : theme.border}`,
+                        backgroundColor: isSelected
+                          ? `${preset.color}20`
+                          : theme.inputBg,
+                        color: isSelected ? preset.color : theme.textSec,
+                        fontWeight: isSelected ? "bold" : "500",
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <form
               onSubmit={handleAddCartao}
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
             >
-              <input
-                placeholder={t.cardNamePlaceholder}
-                value={novoCartaoNome}
-                onChange={(e) => setNovoCartaoNome(e.target.value)}
-                required
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.inputBg,
-                  color: theme.textMain,
-                  fontSize: "0.95rem",
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-              <input
-                placeholder={t.cardEndPlaceholder}
-                maxLength={4}
-                value={novoCartaoFinal}
-                onChange={(e) =>
-                  setNovoCartaoFinal(e.target.value.replace(/\D/g, ""))
-                }
-                required
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.inputBg,
-                  color: theme.textMain,
-                  fontSize: "0.95rem",
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-              <input
-                placeholder={t.cardLimitPlaceholder}
-                value={novoCartaoLimite}
-                onChange={(e) => setNovoCartaoLimite(e.target.value)}
-                required
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.inputBg,
-                  color: theme.textMain,
-                  fontSize: "0.95rem",
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
               <div>
-                <p
+                <label
                   style={{
-                    margin: "5px 0 10px 0",
-                    fontSize: "0.9rem",
+                    display: "block",
+                    fontSize: "0.8rem",
                     color: theme.textMuted,
-                    fontWeight: "500",
+                    fontWeight: "600",
+                    marginBottom: "5px",
+                  }}
+                >
+                  {t.cardName}
+                </label>
+                <input
+                  value={novoCartaoNome}
+                  onChange={(e) => setNovoCartaoNome(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.textMain,
+                    fontSize: "0.95rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "15px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      color: theme.textMuted,
+                      fontWeight: "600",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    {t.cardEndingModal}
+                  </label>
+                  <input
+                    maxLength={4}
+                    value={novoCartaoFinal}
+                    onChange={(e) =>
+                      setNovoCartaoFinal(e.target.value.replace(/\D/g, ""))
+                    }
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: `1px solid ${theme.border}`,
+                      backgroundColor: theme.inputBg,
+                      color: theme.textMain,
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      color: theme.textMuted,
+                      fontWeight: "600",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    {t.totalLimit}
+                  </label>
+                  <input
+                    value={novoCartaoLimite}
+                    onChange={(e) => setNovoCartaoLimite(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: `1px solid ${theme.border}`,
+                      backgroundColor: theme.inputBg,
+                      color: theme.textMain,
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    color: theme.textMuted,
+                    fontWeight: "600",
+                    marginBottom: "5px",
                   }}
                 >
                   {t.cardColor}
-                </p>
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    backgroundColor: theme.inputBg,
+                    padding: "10px",
+                    borderRadius: "10px",
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
                   {[
-                    "#8A05BE",
-                    "#FF7A00",
-                    "#FFC107",
-                    "#107c10",
-                    "#0277bd",
-                    "#111111",
-                    "#E53935",
+                    "#8A05BE", // Nubank
+                    "#EC7000", // Itaú
+                    "#CC092F", // Bradesco
+                    "#EC0000", // Santander
+                    "#F9D308", // BB
+                    "#005CA9", // Caixa
+                    "#FF7A00", // Inter
+                    "#242424", // C6
+                    "#000000", // XP
+                    "#107c10", // Verde genérico
+                    "#E53935", // Vermelho genérico
                   ].map((cor) => (
                     <div
                       key={cor}
                       onClick={() => setNovoCartaoCor(cor)}
                       style={{
-                        width: "35px",
-                        height: "35px",
+                        width: "30px",
+                        height: "30px",
                         borderRadius: "50%",
                         backgroundColor: cor,
                         cursor: "pointer",
@@ -4118,11 +4392,13 @@ export function Dashboard() {
                         transform:
                           novoCartaoCor === cor ? "scale(1.1)" : "none",
                         transition: "all 0.2s",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
                       }}
                     />
                   ))}
                 </div>
               </div>
+
               <div
                 style={{
                   display: "flex",
@@ -4213,14 +4489,11 @@ const translations = {
     availableLimit: "Limite Disp.",
     cardEnding: "Final",
     modalCardTitle: "Adicionar Novo Cartão",
-    cardNamePlaceholder: "Nome (ex: Nubank)",
-    cardEndPlaceholder: "Final (ex: 4321)",
-    cardLimitPlaceholder: "Limite (R$)",
     cardColor: "Cor do Cartão",
     cancel: "Cancelar",
     save: "Salvar",
     accountBalance: "Saldo em Conta",
-    balanceOption: "Saldo em Conta", // Nova chave para o select
+    balanceOption: "Saldo em Conta",
     descriptionLabel: "Descrição",
     valueLabel: "Valor",
     dateLabel: "Data",
@@ -4254,6 +4527,12 @@ const translations = {
     all: "Todos",
     received: "Recebidos",
     sent: "Enviados",
+    transactionsCount: "transações",
+    chooseModel: "Escolha um modelo",
+    custom: "Personalizado",
+    cardName: "Nome do Cartão",
+    cardEndingModal: "Final (4 dígitos)",
+    totalLimit: "Limite Total",
     months: [
       "Janeiro",
       "Fevereiro",
@@ -4290,8 +4569,6 @@ const translations = {
     newTransaction: "New Transaction",
     income: "Income",
     expense: "Expense",
-    descPlaceholder: "Ex: Grocery",
-    valPlaceholder: "0.00",
     btnRegister: "Register",
     history: "Recent Transactions",
     noTransactions: "No transactions yet.",
@@ -4308,14 +4585,11 @@ const translations = {
     availableLimit: "Avail. Limit",
     cardEnding: "Ending",
     modalCardTitle: "Add New Card",
-    cardNamePlaceholder: "Name (ex: Nubank)",
-    cardEndPlaceholder: "Ending (ex: 4321)",
-    cardLimitPlaceholder: "Limit ($)",
     cardColor: "Card Color",
     cancel: "Cancel",
     save: "Save",
     accountBalance: "Account Balance",
-    balanceOption: "Account Balance", // Nova chave para o select
+    balanceOption: "Account Balance",
     descriptionLabel: "Description",
     valueLabel: "Value",
     dateLabel: "Date",
@@ -4350,6 +4624,12 @@ const translations = {
     all: "All",
     received: "Received",
     sent: "Sent",
+    transactionsCount: "transactions",
+    chooseModel: "Choose a preset",
+    custom: "Custom",
+    cardName: "Card Name",
+    cardEndingModal: "Ending (4 digits)",
+    totalLimit: "Total Limit",
     months: [
       "January",
       "February",
@@ -4386,8 +4666,6 @@ const translations = {
     newTransaction: "Nueva Transacción",
     income: "Ingreso",
     expense: "Gasto",
-    descPlaceholder: "Ej: Mercado",
-    valPlaceholder: "0,00",
     btnRegister: "Registrar",
     history: "Últimas Transações",
     noTransactions: "Aún no hay transacciones.",
@@ -4404,14 +4682,11 @@ const translations = {
     availableLimit: "Límite Disp.",
     cardEnding: "Termina en",
     modalCardTitle: "Agregar Nueva Tarjeta",
-    cardNamePlaceholder: "Nombre (ej: Nubank)",
-    cardEndPlaceholder: "Termina en (ej: 4321)",
-    cardLimitPlaceholder: "Límite ($)",
     cardColor: "Color de Tarjeta",
     cancel: "Cancelar",
     save: "Guardar",
     accountBalance: "Saldo en Cuenta",
-    balanceOption: "Saldo en Cuenta", // Nova chave para o select
+    balanceOption: "Saldo en Cuenta",
     descriptionLabel: "Descripción",
     valueLabel: "Valor",
     dateLabel: "Fecha",
@@ -4445,6 +4720,12 @@ const translations = {
     all: "Todos",
     received: "Recibidos",
     sent: "Enviados",
+    transactionsCount: "transacciones",
+    chooseModel: "Elige un modelo",
+    custom: "Personalizado",
+    cardName: "Nombre de la Tarjeta",
+    cardEndingModal: "Termina en (4 dígitos)",
+    totalLimit: "Límite Total",
     months: [
       "Enero",
       "Febrero",
@@ -4481,8 +4762,6 @@ const translations = {
     newTransaction: "Nouvelle Transaction",
     income: "Revenu",
     expense: "Dépense",
-    descPlaceholder: "Ex: Marché",
-    valPlaceholder: "0,00",
     btnRegister: "Enregistrer",
     history: "Dernières Transactions",
     noTransactions: "Aucune transaction.",
@@ -4499,14 +4778,11 @@ const translations = {
     availableLimit: "Limite Disp.",
     cardEnding: "Se termine par",
     modalCardTitle: "Ajouter une Carte",
-    cardNamePlaceholder: "Nom (ex: Nubank)",
-    cardEndPlaceholder: "Finissant par (ex: 4321)",
-    cardLimitPlaceholder: "Limite (€)",
     cardColor: "Couleur de la Carte",
     cancel: "Annuler",
     save: "Sauvegarder",
     accountBalance: "Solde du Compte",
-    balanceOption: "Solde du Compte", // Nova chave para o select
+    balanceOption: "Solde du Compte",
     descriptionLabel: "Description",
     valueLabel: "Valeur",
     dateLabel: "Date",
@@ -4541,6 +4817,12 @@ const translations = {
     all: "Tous",
     received: "Reçus",
     sent: "Envoyés",
+    transactionsCount: "transactions",
+    chooseModel: "Choisissez un modèle",
+    custom: "Personnalisé",
+    cardName: "Nom de la Carte",
+    cardEndingModal: "Se termine par (4 chiffres)",
+    totalLimit: "Limite Totale",
     months: [
       "Janvier",
       "Février",
@@ -4551,7 +4833,7 @@ const translations = {
       "Juillet",
       "Août",
       "Septembre",
-      "Octubre",
+      "Octobre",
       "Novembro",
       "Décembre",
     ],
@@ -4577,8 +4859,6 @@ const translations = {
     newTransaction: "Neue Transaktion",
     income: "Einnahme",
     expense: "Ausgabe",
-    descPlaceholder: "Bsp: Markt",
-    valPlaceholder: "0,00",
     btnRegister: "Registrieren",
     history: "Letzte Transaktionen",
     noTransactions: "Noch keine Transaktionen.",
@@ -4595,14 +4875,11 @@ const translations = {
     availableLimit: "Verf. Limit",
     cardEnding: "Endet com",
     modalCardTitle: "Neue Karte hinzufügen",
-    cardNamePlaceholder: "Name (z.B. Nubank)",
-    cardEndPlaceholder: "Endet mit (z.B. 4321)",
-    cardLimitPlaceholder: "Limit (€)",
     cardColor: "Kartenfarbe",
     cancel: "Abbrechen",
     save: "Speichern",
     accountBalance: "Kontostand",
-    balanceOption: "Kontostand", // Nova chave para o select
+    balanceOption: "Kontostand",
     descriptionLabel: "Beschreibung",
     valueLabel: "Wert",
     dateLabel: "Datum",
@@ -4637,6 +4914,12 @@ const translations = {
     all: "Alle",
     received: "Erhalten",
     sent: "Gesendet",
+    transactionsCount: "Transaktionen",
+    chooseModel: "Wählen Sie eine Vorlage",
+    custom: "Benutzerdefiniert",
+    cardName: "Kartenname",
+    cardEndingModal: "Endet mit (4 Ziffern)",
+    totalLimit: "Gesamtlimit",
     months: [
       "Januar",
       "Februar",
