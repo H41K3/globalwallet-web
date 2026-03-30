@@ -76,7 +76,8 @@ const CategoryOption = ({
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        if (!isSelected) e.currentTarget.style.backgroundColor = theme.highlightBg;
+        if (!isSelected)
+          e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
         if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
@@ -126,7 +127,8 @@ const PaymentMethodOption = ({
         transition: "background-color 0.2s",
       }}
       onMouseEnter={(e) => {
-        if (!isSelected) e.currentTarget.style.backgroundColor = theme.highlightBg;
+        if (!isSelected)
+          e.currentTarget.style.backgroundColor = theme.highlightBg;
       }}
       onMouseLeave={(e) => {
         if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
@@ -192,15 +194,15 @@ export function Dashboard() {
   // 1. ESTADOS GLOBAIS E TEMA
   // ==========================================
   const [abaAtiva, setAbaAtiva] = useState<AbaType>(
-    (localStorage.getItem("abaAtiva") as AbaType) || "home"
+    (localStorage.getItem("abaAtiva") as AbaType) || "home",
   );
 
   const [idioma, setIdioma] = useState<IdiomaType>(
-    (localStorage.getItem("idioma") as IdiomaType) || "pt"
+    (localStorage.getItem("idioma") as IdiomaType) || "pt",
   );
 
   const [isDarkMode, setIsDarkMode] = useState(
-    () => localStorage.getItem("theme") === "dark"
+    () => localStorage.getItem("theme") === "dark",
   );
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -212,7 +214,9 @@ export function Dashboard() {
   }, []);
 
   const [menuAberto, setMenuAberto] = useState(false);
-  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">("BRL");
+  const [moedaExibicao, setMoedaExibicao] = useState<"BRL" | "USD" | "EUR">(
+    "BRL",
+  );
   const [cotacoes, setCotacoes] = useState({ usd: 0, eur: 0 });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -289,8 +293,11 @@ export function Dashboard() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [novaDescricao, setNovaDescricao] = useState("");
   const [novoValor, setNovoValor] = useState("");
-  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<"INCOME" | "EXPENSE">("EXPENSE");
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>("OTHER");
+  const [tipoTransacaoSelecionado, setTipoTransacaoSelecionado] = useState<
+    "INCOME" | "EXPENSE"
+  >("EXPENSE");
+  const [categoriaSelecionada, setCategoriaSelecionada] =
+    useState<string>("OTHER");
   const [menuCategoriaAberto, setMenuCategoriaAberto] = useState(false);
   const menuCategoriaRef = useRef<HTMLDivElement>(null);
 
@@ -345,13 +352,22 @@ export function Dashboard() {
 
   useEffect(() => {
     const handleClickFora = (event: MouseEvent) => {
-      if (menuCategoriaRef.current && !menuCategoriaRef.current.contains(event.target as Node)) {
+      if (
+        menuCategoriaRef.current &&
+        !menuCategoriaRef.current.contains(event.target as Node)
+      ) {
         setMenuCategoriaAberto(false);
       }
-      if (menuCartaoRef.current && !menuCartaoRef.current.contains(event.target as Node)) {
+      if (
+        menuCartaoRef.current &&
+        !menuCartaoRef.current.contains(event.target as Node)
+      ) {
         setMenuCartaoAberto(false);
       }
-      if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
+      if (
+        monthPickerRef.current &&
+        !monthPickerRef.current.contains(event.target as Node)
+      ) {
         setIsMonthPickerOpen(false);
       }
     };
@@ -363,10 +379,10 @@ export function Dashboard() {
     const categoriasValidas = getCategoriasDisponiveis();
     if (!categoriasValidas.includes(categoriaSelecionada)) {
       setCategoriaSelecionada(
-        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER"
+        tipoTransacaoSelecionado === "INCOME" ? "SALARY" : "OTHER",
       );
     }
-    
+
     // Se mudou para entrada, reseta a forma de pagamento para PIX se estiver com cartão selecionado
     if (tipoTransacaoSelecionado === "INCOME") {
       if (formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX") {
@@ -380,7 +396,10 @@ export function Dashboard() {
     e.preventDefault();
 
     if (novaSenha === senhaAtual) {
-      showToast(t.errorSamePassword || "A nova senha deve ser diferente da atual.", "error");
+      showToast(
+        t.errorSamePassword || "A nova senha deve ser diferente da atual.",
+        "error",
+      );
       return;
     }
     if (novaSenha !== confirmarNovaSenha) {
@@ -388,7 +407,10 @@ export function Dashboard() {
       return;
     }
     if (novaSenha.length < 6) {
-      showToast(t.errorShortPassword || "A senha deve ter no mínimo 6 caracteres.", "error");
+      showToast(
+        t.errorShortPassword || "A senha deve ter no mínimo 6 caracteres.",
+        "error",
+      );
       return;
     }
 
@@ -398,17 +420,21 @@ export function Dashboard() {
       await axios.put(
         "https://swiss-project-api.onrender.com/api/v1/auth/change-password",
         { currentPassword: senhaAtual, newPassword: novaSenha },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      showToast(t.successPasswordUpdate || "Senha atualizada com sucesso!", "success");
+      showToast(
+        t.successPasswordUpdate || "Senha atualizada com sucesso!",
+        "success",
+      );
       setSenhaAtual("");
       setNovaSenha("");
       setConfirmarNovaSenha("");
     } catch (erro) {
       console.error(erro);
       showToast(
-        t.errorPasswordUpdate || "Erro ao trocar senha. Verifique se a senha atual está correta.",
-        "error"
+        t.errorPasswordUpdate ||
+          "Erro ao trocar senha. Verifique se a senha atual está correta.",
+        "error",
       );
     } finally {
       setIsLoading(false);
@@ -420,12 +446,18 @@ export function Dashboard() {
     if (!token) return navigate("/");
     try {
       const [resSaldo, resTrans, resPerfil] = await Promise.all([
-        axios.get("https://swiss-project-api.onrender.com/api/v1/transactions/balance", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get("https://swiss-project-api.onrender.com/api/v1/transactions", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        axios.get(
+          "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+        axios.get(
+          "https://swiss-project-api.onrender.com/api/v1/transactions",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
         axios.get("https://swiss-project-api.onrender.com/api/v1/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -433,12 +465,12 @@ export function Dashboard() {
       setSaldo(
         resSaldo.data.balance !== undefined
           ? resSaldo.data.balance
-          : resSaldo.data
+          : resSaldo.data,
       );
       setTransacoes(
         Array.isArray(resTrans.data)
           ? resTrans.data
-          : resTrans.data.content || []
+          : resTrans.data.content || [],
       );
       if (resPerfil && resPerfil.data) setPerfilUsuario(resPerfil.data);
     } catch (erro) {
@@ -449,7 +481,9 @@ export function Dashboard() {
 
   const buscarCotacoes = async () => {
     try {
-      const res = await axios.get("https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL");
+      const res = await axios.get(
+        "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL",
+      );
       setCotacoes({
         usd: parseFloat(res.data.USDBRL.bid),
         eur: parseFloat(res.data.EURBRL.bid),
@@ -490,14 +524,19 @@ export function Dashboard() {
         valorParaSalvar = valorNumerico * cotacoes.eur;
       }
 
-      const dataSeguraParaBanco = new Date().toISOString().split("T")[0];
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+      const dia = String(hoje.getDate()).padStart(2, "0");
+      const dataSeguraParaBanco = `${ano}-${mes}-${dia}`;
       const isCard = formaPagamento !== "ACCOUNT" && formaPagamento !== "PIX";
 
       setIsLoading(true);
       await axios.post(
         "https://swiss-project-api.onrender.com/api/v1/transactions",
         {
-          description: novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
+          description:
+            novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
           amount: valorParaSalvar,
           transactionDate: dataSeguraParaBanco,
           type: tipoTransacaoSelecionado,
@@ -505,7 +544,7 @@ export function Dashboard() {
           cardId: isCard ? Number(formaPagamento) : null,
           paymentMethod: isCard ? "CARD" : formaPagamento, // MANDANDO PRO BACKEND (PIX ou ACCOUNT)
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setNovaDescricao("");
       setNovoValor("");
@@ -527,7 +566,9 @@ export function Dashboard() {
       setIsLoading(true);
       await axios.delete(
         `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
       await buscarTudo();
       await buscarCartoes();
@@ -561,45 +602,54 @@ export function Dashboard() {
   const transacoesFiltradas = transacoes.filter((t) => {
     if (!t.transactionDate) return false;
     const [anoStr, mesStr] = t.transactionDate.split("-");
-    return parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro;
+    return (
+      parseInt(anoStr, 10) === anoFiltro && parseInt(mesStr, 10) === mesFiltro
+    );
   });
 
   const totalEntradasMes = transacoesFiltradas
     .filter((t) => t.type === "INCOME" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    
+
   const totalSaidasMes = transacoesFiltradas
     .filter((t) => t.type === "EXPENSE" && !t.card)
     .reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    
+
   const saldoMes = totalEntradasMes - totalSaidasMes;
 
-  const transacoesAgrupadas = transacoesFiltradas.reduce((grupos, transacao) => {
-    const isCard = !!transacao.card;
-    const isPix = transacao.paymentMethod === "PIX";
-    
-    // Agrupa inteligente na aba de Extrato (Statement)
-    const key = isCard ? `card-${transacao.card?.id}` : isPix ? "pix" : "account";
-    const label = isCard
-      ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})`
-      : isPix 
-        ? `⚡ Pix` 
-        : `🏦 ${t.transferLabel || "Transferência"}`;
+  const transacoesAgrupadas = transacoesFiltradas.reduce(
+    (grupos, transacao) => {
+      const isCard = !!transacao.card;
+      const isPix = transacao.paymentMethod === "PIX";
 
-    if (!grupos[key]) {
-      grupos[key] = {
-        label,
-        items: [],
-        color: isCard
-          ? transacao.card?.color || transacao.card?.cor || theme.textMain
-          : isPix 
-            ? "#32bcad" 
-            : "#0277bd",
-      };
-    }
-    grupos[key].items.push(transacao);
-    return grupos;
-  }, {} as Record<string, { label: string; items: Transacao[]; color: string }>);
+      // Agrupa inteligente na aba de Extrato (Statement)
+      const key = isCard
+        ? `card-${transacao.card?.id}`
+        : isPix
+          ? "pix"
+          : "account";
+      const label = isCard
+        ? `💳 ${transacao.card?.nome || transacao.card?.name} (${transacao.card?.lastDigits})`
+        : isPix
+          ? `⚡ Pix`
+          : `🏦 ${t.transferLabel || "Transferência"}`;
+
+      if (!grupos[key]) {
+        grupos[key] = {
+          label,
+          items: [],
+          color: isCard
+            ? transacao.card?.color || transacao.card?.cor || theme.textMain
+            : isPix
+              ? "#32bcad"
+              : "#0277bd",
+        };
+      }
+      grupos[key].items.push(transacao);
+      return grupos;
+    },
+    {} as Record<string, { label: string; items: Transacao[]; color: string }>,
+  );
 
   const buscarCartoes = async () => {
     const token = localStorage.getItem("token");
@@ -607,7 +657,7 @@ export function Dashboard() {
     try {
       const resposta = await axios.get(
         "https://swiss-project-api.onrender.com/api/v1/cards",
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setCartoes(resposta.data);
     } catch (erro) {
@@ -620,9 +670,12 @@ export function Dashboard() {
     const token = localStorage.getItem("token");
     try {
       setIsLoading(true);
-      await axios.delete(`https://swiss-project-api.onrender.com/api/v1/cards/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://swiss-project-api.onrender.com/api/v1/cards/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       await buscarCartoes();
       showToast("Cartão excluído com sucesso!", "success");
     } catch (erro) {
@@ -637,7 +690,7 @@ export function Dashboard() {
     e.preventDefault();
     if (!novoCartaoNome || !novoCartaoFinal || !novoCartaoLimite) return;
     const limiteNumerico = parseFloat(
-      novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", ".")
+      novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", "."),
     );
     if (isNaN(limiteNumerico)) {
       showToast(t.errorValue, "error");
@@ -656,7 +709,7 @@ export function Dashboard() {
           totalLimit: limiteNumerico,
           color: novoCartaoCor,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setIsCardModalOpen(false);
       setNovoCartaoNome("");
@@ -681,19 +734,28 @@ export function Dashboard() {
       tipoTransacaoSelecionado === "INCOME"
         ? ["SALARY", "SALES"]
         : ["BILLS", "ENTERTAINMENT", "FOOD", "MARKET", "TRANSPORT"];
-    
+
     catKeys.sort((a, b) =>
-      categoryMap[a][idioma].localeCompare(categoryMap[b][idioma])
+      categoryMap[a][idioma].localeCompare(categoryMap[b][idioma]),
     );
     return [...catKeys, "OTHER"];
   };
 
   // Função que retorna a lista de formas de pagamento em Ordem Alfabética (A-Z)
   const getPaymentOptions = () => {
-    const options: Array<{ type: "PIX" | "ACCOUNT" | "CARD"; id: string; label: string; card?: Cartao }> = [];
-    
+    const options: Array<{
+      type: "PIX" | "ACCOUNT" | "CARD";
+      id: string;
+      label: string;
+      card?: Cartao;
+    }> = [];
+
     options.push({ type: "PIX", id: "PIX", label: "Pix" });
-    options.push({ type: "ACCOUNT", id: "ACCOUNT", label: t.transferLabel || "Transferência" });
+    options.push({
+      type: "ACCOUNT",
+      id: "ACCOUNT",
+      label: t.transferLabel || "Transferência",
+    });
 
     if (tipoTransacaoSelecionado === "EXPENSE") {
       cartoes.forEach((c) => {
@@ -760,7 +822,7 @@ export function Dashboard() {
       ko: "ko-KR",
     };
     return new Date(
-      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]))
+      Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])),
     ).toLocaleDateString(mapaLocais[idioma], {
       timeZone: "UTC",
       day: "2-digit",
@@ -769,7 +831,9 @@ export function Dashboard() {
     });
   };
 
-  const cartaoSelecionado = cartoes.find((c) => String(c.id) === formaPagamento);
+  const cartaoSelecionado = cartoes.find(
+    (c) => String(c.id) === formaPagamento,
+  );
   const opcoesPagamento = getPaymentOptions();
 
   const AppLogo = ({ size = 45 }: { size?: number }) => (
@@ -799,7 +863,15 @@ export function Dashboard() {
     </div>
   );
 
-  const SidebarItem = ({ id, icon, label }: { id: AbaType; icon: string; label: string }) => {
+  const SidebarItem = ({
+    id,
+    icon,
+    label,
+  }: {
+    id: AbaType;
+    icon: string;
+    label: string;
+  }) => {
     const isAtivo = abaAtiva === id;
     return (
       <li
@@ -813,12 +885,15 @@ export function Dashboard() {
           cursor: "pointer",
           fontWeight: isAtivo ? "bold" : "normal",
           color: isAtivo ? (isDarkMode ? "#f5f5f5" : theme.red) : theme.textSec,
-          borderLeft: isAtivo ? `4px solid ${theme.red}` : "4px solid transparent",
+          borderLeft: isAtivo
+            ? `4px solid ${theme.red}`
+            : "4px solid transparent",
           backgroundColor: isAtivo ? theme.highlightBg : "transparent",
           transition: "all 0.2s ease-in-out",
         }}
         onMouseEnter={(e) => {
-          if (!isAtivo) e.currentTarget.style.backgroundColor = theme.sidebarHover;
+          if (!isAtivo)
+            e.currentTarget.style.backgroundColor = theme.sidebarHover;
         }}
         onMouseLeave={(e) => {
           if (!isAtivo) e.currentTarget.style.backgroundColor = "transparent";
@@ -829,11 +904,12 @@ export function Dashboard() {
     );
   };
 
-  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort((a, b) =>
-    t.langs[a].localeCompare(t.langs[b])
+  const idiomasOrdenados = (Object.keys(translations) as IdiomaType[]).sort(
+    (a, b) => t.langs[a].localeCompare(t.langs[b]),
   );
-  
-  const catSelecionadaData = categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
+
+  const catSelecionadaData =
+    categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
 
   // ==========================================
   // RENDERIZAÇÃO PRINCIPAL (JSX)
@@ -887,7 +963,9 @@ export function Dashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)",
+            backgroundColor: isDarkMode
+              ? "rgba(0,0,0,0.8)"
+              : "rgba(255,255,255,0.8)",
             zIndex: 9999,
             display: "flex",
             flexDirection: "column",
@@ -1140,7 +1218,9 @@ export function Dashboard() {
                       onClick={() => setMoedaExibicao(moeda)}
                       style={{
                         background:
-                          moedaExibicao === moeda ? theme.highlightBg : "transparent",
+                          moedaExibicao === moeda
+                            ? theme.highlightBg
+                            : "transparent",
                         border: "none",
                         padding: "4px 10px",
                         borderRadius: "6px",
@@ -1307,8 +1387,12 @@ export function Dashboard() {
                         style={{
                           background: isSelected
                             ? isExpense
-                              ? isDarkMode ? "#4a1c1c" : "#ffebee"
-                              : isDarkMode ? "#1b3320" : "#e8f5e9"
+                              ? isDarkMode
+                                ? "#4a1c1c"
+                                : "#ffebee"
+                              : isDarkMode
+                                ? "#1b3320"
+                                : "#e8f5e9"
                             : "transparent",
                           border: "none",
                           padding: "8px 25px",
@@ -1321,7 +1405,9 @@ export function Dashboard() {
                               ? theme.red
                               : theme.green
                             : theme.textMuted,
-                          boxShadow: isSelected ? "0 2px 5px rgba(0,0,0,0.2)" : "none",
+                          boxShadow: isSelected
+                            ? "0 2px 5px rgba(0,0,0,0.2)"
+                            : "none",
                           transition: "all 0.2s",
                         }}
                       >
@@ -1352,7 +1438,9 @@ export function Dashboard() {
                       {t.selCategory}
                     </p>
                     <div
-                      onClick={() => setMenuCategoriaAberto(!menuCategoriaAberto)}
+                      onClick={() =>
+                        setMenuCategoriaAberto(!menuCategoriaAberto)
+                      }
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -1389,7 +1477,9 @@ export function Dashboard() {
                         style={{
                           fontSize: "0.7rem",
                           color: theme.textMuted,
-                          transform: menuCategoriaAberto ? "rotate(180deg)" : "none",
+                          transform: menuCategoriaAberto
+                            ? "rotate(180deg)"
+                            : "none",
                           transition: "transform 0.2s",
                         }}
                       >
@@ -1439,9 +1529,9 @@ export function Dashboard() {
                         letterSpacing: "0.5px",
                       }}
                     >
-                      {tipoTransacaoSelecionado === "EXPENSE" 
-                        ? (t.paymentHistoryLabel || "Forma de Pagamento") 
-                        : (t.receiptMethodLabel || "Forma de Recebimento")}
+                      {tipoTransacaoSelecionado === "EXPENSE"
+                        ? t.paymentHistoryLabel || "Forma de Pagamento"
+                        : t.receiptMethodLabel || "Forma de Recebimento"}
                     </p>
                     <div
                       onClick={() => {
@@ -1512,8 +1602,8 @@ export function Dashboard() {
                                 fontWeight: "500",
                               }}
                             >
-                              {cartaoSelecionado.nome || cartaoSelecionado.name} (
-                              {cartaoSelecionado.lastDigits})
+                              {cartaoSelecionado.nome || cartaoSelecionado.name}{" "}
+                              ({cartaoSelecionado.lastDigits})
                             </span>
                           </>
                         ) : null}
@@ -1522,7 +1612,9 @@ export function Dashboard() {
                         style={{
                           fontSize: "0.7rem",
                           color: theme.textMuted,
-                          transform: menuCartaoAberto ? "rotate(180deg)" : "none",
+                          transform: menuCartaoAberto
+                            ? "rotate(180deg)"
+                            : "none",
                           transition: "transform 0.2s",
                         }}
                       >
@@ -1688,14 +1780,22 @@ export function Dashboard() {
                     .filter((t_row) => t_row.type === tipoTransacaoSelecionado)
                     .map((t_row, i) => {
                       const isExpense = t_row.type === "EXPENSE";
-                      const infoExibicao = getValorExibicao(Math.abs(t_row.amount || 0));
+                      const infoExibicao = getValorExibicao(
+                        Math.abs(t_row.amount || 0),
+                      );
                       const categoriaVisual =
-                        categoryMap[t_row.category || "OTHER"] || categoryMap["OTHER"];
-                      const isOutros = !t_row.category || t_row.category === "OTHER";
+                        categoryMap[t_row.category || "OTHER"] ||
+                        categoryMap["OTHER"];
+                      const isOutros =
+                        !t_row.category || t_row.category === "OTHER";
                       const corDeFundoIcone = isOutros
                         ? isExpense
-                          ? isDarkMode ? "#4a1c1c" : "#ffebee"
-                          : isDarkMode ? "#1b3320" : "#e8f5e9"
+                          ? isDarkMode
+                            ? "#4a1c1c"
+                            : "#ffebee"
+                          : isDarkMode
+                            ? "#1b3320"
+                            : "#e8f5e9"
                         : categoriaVisual.bgColor;
 
                       return (
@@ -1753,13 +1853,15 @@ export function Dashboard() {
                                   {categoriaVisual[idioma]}
                                 </span>
                                 • {formatarDataLocal(t_row.transactionDate)}
-                                
                                 {/* Lógica Visual: Pix vs Transferência vs Cartão */}
                                 {t_row.card ? (
                                   <span
                                     style={{
                                       marginLeft: "6px",
-                                      color: t_row.card.color || t_row.card.cor || theme.textMuted,
+                                      color:
+                                        t_row.card.color ||
+                                        t_row.card.cor ||
+                                        theme.textMuted,
                                       fontWeight: "600",
                                     }}
                                   >
@@ -1793,10 +1895,10 @@ export function Dashboard() {
                                       fontWeight: "600",
                                     }}
                                   >
-                                    • 🏦 {t.transferLabel || "Transferência"} / ⚡ Pix
+                                    • 🏦 {t.transferLabel || "Transferência"} /
+                                    ⚡ Pix
                                   </span>
                                 )}
-
                               </div>
                             </div>
                           </td>
@@ -1831,7 +1933,9 @@ export function Dashboard() {
                     })}
                 </tbody>
               </table>
-              {transacoes.filter((t_row) => t_row.type === tipoTransacaoSelecionado).length === 0 && (
+              {transacoes.filter(
+                (t_row) => t_row.type === tipoTransacaoSelecionado,
+              ).length === 0 && (
                 <p
                   style={{
                     textAlign: "center",
@@ -1849,7 +1953,9 @@ export function Dashboard() {
 
         {/* ================= ABA 2: EXTRATO DETALHADO ================= */}
         {abaAtiva === "statement" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+          >
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -1864,7 +1970,9 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 📊 {t.statement}
               </h2>
               <div
@@ -2195,14 +2303,22 @@ export function Dashboard() {
                     <tbody>
                       {grupo.items.map((t_row, i) => {
                         const isExpense = t_row.type === "EXPENSE";
-                        const infoExibicao = getValorExibicao(Math.abs(t_row.amount || 0));
+                        const infoExibicao = getValorExibicao(
+                          Math.abs(t_row.amount || 0),
+                        );
                         const categoriaVisual =
-                          categoryMap[t_row.category || "OTHER"] || categoryMap["OTHER"];
-                        const isOutros = !t_row.category || t_row.category === "OTHER";
+                          categoryMap[t_row.category || "OTHER"] ||
+                          categoryMap["OTHER"];
+                        const isOutros =
+                          !t_row.category || t_row.category === "OTHER";
                         const corDeFundoIcone = isOutros
                           ? isExpense
-                            ? isDarkMode ? "#4a1c1c" : "#ffebee"
-                            : isDarkMode ? "#1b3320" : "#e8f5e9"
+                            ? isDarkMode
+                              ? "#4a1c1c"
+                              : "#ffebee"
+                            : isDarkMode
+                              ? "#1b3320"
+                              : "#e8f5e9"
                           : categoriaVisual.bgColor;
 
                         return (
@@ -2254,7 +2370,9 @@ export function Dashboard() {
                                 >
                                   <span
                                     style={{
-                                      color: isExpense ? theme.red : theme.green,
+                                      color: isExpense
+                                        ? theme.red
+                                        : theme.green,
                                       fontWeight: "bold",
                                       marginRight: "6px",
                                     }}
@@ -2262,13 +2380,15 @@ export function Dashboard() {
                                     {categoriaVisual[idioma]}
                                   </span>
                                   • {formatarDataLocal(t_row.transactionDate)}
-                                  
                                   {/* Lógica Visual do Extrato: Pix vs Transferência vs Cartão */}
                                   {t_row.card ? (
                                     <span
                                       style={{
                                         marginLeft: "6px",
-                                        color: t_row.card.color || t_row.card.cor || theme.textMuted,
+                                        color:
+                                          t_row.card.color ||
+                                          t_row.card.cor ||
+                                          theme.textMuted,
                                         fontWeight: "600",
                                       }}
                                     >
@@ -2302,10 +2422,10 @@ export function Dashboard() {
                                         fontWeight: "600",
                                       }}
                                     >
-                                      • 🏦 {t.transferLabel || "Transferência"} / ⚡ Pix
+                                      • 🏦 {t.transferLabel || "Transferência"}{" "}
+                                      / ⚡ Pix
                                     </span>
                                   )}
-
                                 </div>
                               </div>
                             </td>
@@ -2320,12 +2440,15 @@ export function Dashboard() {
                                 }}
                               >
                                 {isExpense ? "- " : "+ "}
-                                {infoExibicao.simbolo} {infoExibicao.valorFormatado}
+                                {infoExibicao.simbolo}{" "}
+                                {infoExibicao.valorFormatado}
                               </div>
                             </td>
                             <td style={{ width: "40px", textAlign: "right" }}>
                               <button
-                                onClick={() => handleDeleteTransaction(t_row.id)}
+                                onClick={() =>
+                                  handleDeleteTransaction(t_row.id)
+                                }
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -2387,7 +2510,9 @@ export function Dashboard() {
                 boxSizing: "border-box",
               }}
             >
-              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 💳 {t.cards}
               </h2>
               <button
@@ -2581,7 +2706,9 @@ export function Dashboard() {
                       </p>
                       <p style={{ margin: 0, fontSize: "0.9rem" }}>
                         R${" "}
-                        {(cartao.totalLimit - (cartao.currentInvoice || 0)).toLocaleString("pt-BR", {
+                        {(
+                          cartao.totalLimit - (cartao.currentInvoice || 0)
+                        ).toLocaleString("pt-BR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -2623,7 +2750,9 @@ export function Dashboard() {
 
         {/* ================= ABA 4: CONFIGURAÇÕES ================= */}
         {abaAtiva === "settings" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+          >
             <div
               style={{
                 backgroundColor: theme.bgCard,
@@ -2636,7 +2765,9 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              <h2 style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}>
+              <h2
+                style={{ color: theme.textMain, margin: 0, fontSize: "1.3rem" }}
+              >
                 ⚙️ {t.settings}
               </h2>
             </div>
@@ -2883,7 +3014,9 @@ export function Dashboard() {
                     >
                       {t.darkModeLabel || "Modo Escuro (Dark Mode)"}
                     </strong>
-                    <span style={{ fontSize: "0.8rem", color: theme.textMuted }}>
+                    <span
+                      style={{ fontSize: "0.8rem", color: theme.textMuted }}
+                    >
                       {t.darkModeDesc || "Altera o tema visual do aplicativo."}
                     </span>
                   </div>
@@ -3202,7 +3335,8 @@ export function Dashboard() {
                           novoCartaoCor === cor
                             ? "3px solid #ccc"
                             : "2px solid transparent",
-                        transform: novoCartaoCor === cor ? "scale(1.1)" : "none",
+                        transform:
+                          novoCartaoCor === cor ? "scale(1.1)" : "none",
                         transition: "all 0.2s",
                       }}
                     />
