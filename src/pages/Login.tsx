@@ -107,7 +107,7 @@ export function Login() {
     setError(null);
     try {
       const response = await axios.post(
-        "https://swiss-project-api.onrender.com/api/v1/auth/login",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/auth/login",
         {
           cpf: cpf.replace(/\D/g, ""),
           password: password,

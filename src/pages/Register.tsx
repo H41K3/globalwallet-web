@@ -121,7 +121,7 @@ export function Register() {
 
     try {
       await axios.post(
-        "https://swiss-project-api.onrender.com/api/v1/auth/register",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/auth/register",
         {
           fullName,
           cpf: cpf.replace(/\D/g, ""),

@@ -571,7 +571,7 @@ export function Dashboard() {
       setIsLoading(true);
       const token = localStorage.getItem("token");
       await axios.put(
-        "https://swiss-project-api.onrender.com/api/v1/auth/change-password",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/auth/change-password",
         { currentPassword: senhaAtual, newPassword: novaSenha },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -600,18 +600,18 @@ export function Dashboard() {
     try {
       const [resSaldo, resTrans, resPerfil] = await Promise.all([
         axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions/balance",
+          "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions/balance",
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         ),
         axios.get(
-          "https://swiss-project-api.onrender.com/api/v1/transactions",
+          "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions",
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         ),
-        axios.get("https://swiss-project-api.onrender.com/api/v1/auth/me", {
+        axios.get("https://globalwallet-api-9ffu.onrender.com/api/v1/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -684,7 +684,7 @@ export function Dashboard() {
 
       setIsLoading(true);
       await axios.post(
-        "https://swiss-project-api.onrender.com/api/v1/transactions",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions",
         {
           description:
             novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
@@ -717,7 +717,7 @@ export function Dashboard() {
     try {
       setIsLoading(true);
       await axios.delete(
-        `https://swiss-project-api.onrender.com/api/v1/transactions/${id}`,
+        `https://globalwallet-api-9ffu.onrender.com/api/v1/transactions/${id}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
@@ -919,7 +919,7 @@ export function Dashboard() {
     if (!token) return;
     try {
       const resposta = await axios.get(
-        "https://swiss-project-api.onrender.com/api/v1/cards",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/cards",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setCartoes(resposta.data);
@@ -934,7 +934,7 @@ export function Dashboard() {
     try {
       setIsLoading(true);
       await axios.delete(
-        `https://swiss-project-api.onrender.com/api/v1/cards/${id}`,
+        `https://globalwallet-api-9ffu.onrender.com/api/v1/cards/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -965,7 +965,7 @@ export function Dashboard() {
     try {
       setIsLoading(true);
       await axios.post(
-        "https://swiss-project-api.onrender.com/api/v1/cards",
+        "https://globalwallet-api-9ffu.onrender.com/api/v1/cards",
         {
           name: novoCartaoNome,
           lastDigits: novoCartaoFinal,
