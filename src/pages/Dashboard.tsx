@@ -571,7 +571,7 @@ export function Dashboard() {
       setIsLoading(true);
       const token = localStorage.getItem("token");
       await axios.put(
-        "https://globalwallet-api-9ffu.onrender.com/api/v1/auth/change-password",
+        "https://localhost:8080",
         { currentPassword: senhaAtual, newPassword: novaSenha },
         { headers: { Authorization: `Bearer ${token}` } },
       );
