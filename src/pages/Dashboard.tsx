@@ -2,6 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const BASE_URL =
+  window.location.hostname === "localhost"
+    ? "http://localhost:8080"
+    : "https://globalwallet-api-9ffu.onrender.com";
+
 type IdiomaType = "pt" | "en" | "es" | "fr" | "de";
 type AbaType = "home" | "statement" | "cards" | "settings";
 
@@ -25,8 +30,10 @@ interface Cartao {
   currentInvoice: number;
   cor?: string;
   color?: string;
-  bandeira?: string; // Preparado para o Backend
-  flag?: string; // Preparado para o Backend (em inglês)
+  closingDate?: number;
+  dueDate?: number;
+  bandeira?: string;
+  flag?: string;
 }
 
 type ThemeType = {
@@ -44,22 +51,6 @@ type ThemeType = {
   green: string;
   red: string;
 };
-
-// ==========================================
-// PRESETS DE CARTÕES E BANDEIRAS
-// ==========================================
-const PRESET_CARDS = [
-  { name: "Nubank", color: "#8A05BE" },
-  { name: "Itaú", color: "#EC7000" },
-  { name: "Bradesco", color: "#CC092F" },
-  { name: "Santander", color: "#EC0000" },
-  { name: "Banco do Brasil", color: "#F9D308" },
-  { name: "Caixa", color: "#005CA9" },
-  { name: "Inter", color: "#FF7A00" },
-  { name: "C6 Bank", color: "#242424" },
-  { name: "XP", color: "#000000" },
-  { name: "Personalizado", color: "#616161" },
-];
 
 const ChipSVG = () => (
   <svg
@@ -119,12 +110,8 @@ const VisaSVG = () => (
   </div>
 );
 
-// Função Inteligente para Renderizar a Bandeira Correta
 const renderBandeira = (cartao: Cartao) => {
-  // 1º Tenta usar a bandeira que veio do banco de dados
   const flagDB = cartao.bandeira?.toLowerCase() || cartao.flag?.toLowerCase();
-
-  // 2º Se não tiver no DB ainda, tenta adivinhar pelo nome do cartão
   const nomeBanco = (cartao.nome || cartao.name || "").toLowerCase();
 
   if (
@@ -138,13 +125,9 @@ const renderBandeira = (cartao: Cartao) => {
     return <VisaSVG />;
   }
 
-  // Default / Fallback
   return <MastercardSVG />;
 };
 
-// ==========================================
-// UTILITÁRIOS GLOBAIS
-// ==========================================
 const obterDataAtualLocal = () => {
   const hoje = new Date();
   const ano = hoje.getFullYear();
@@ -153,9 +136,6 @@ const obterDataAtualLocal = () => {
   return `${ano}-${mes}-${dia}`;
 };
 
-// ==========================================
-// CUSTOM COMPONENTS
-// ==========================================
 const CategoryOption = ({
   catKey,
   idiom,
@@ -248,7 +228,7 @@ const PaymentMethodOption = ({
           <span style={{ fontSize: "1.1rem" }}>⚡</span>
           <span
             style={{
-              fontWeight: isSelected ? "600" : "500",
+              fontWeight: "500",
               color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
@@ -262,7 +242,7 @@ const PaymentMethodOption = ({
           <span style={{ fontSize: "1.1rem" }}>🏦</span>
           <span
             style={{
-              fontWeight: isSelected ? "600" : "500",
+              fontWeight: "500",
               color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
@@ -276,7 +256,7 @@ const PaymentMethodOption = ({
           <span style={{ fontSize: "1.1rem" }}>💰</span>
           <span
             style={{
-              fontWeight: isSelected ? "600" : "500",
+              fontWeight: "500",
               color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
@@ -297,7 +277,7 @@ const PaymentMethodOption = ({
           </span>
           <span
             style={{
-              fontWeight: isSelected ? "600" : "500",
+              fontWeight: "500",
               color: isSelected ? theme.textMain : theme.textSec,
               fontSize: "0.85rem",
             }}
@@ -313,9 +293,6 @@ const PaymentMethodOption = ({
 export function Dashboard() {
   const navigate = useNavigate();
 
-  // ==========================================
-  // 1. ESTADOS GLOBAIS E TEMA
-  // ==========================================
   const [abaAtiva, setAbaAtiva] = useState<AbaType>(
     (localStorage.getItem("abaAtiva") as AbaType) || "home",
   );
@@ -377,9 +354,6 @@ export function Dashboard() {
         red: "#d91616",
       };
 
-  // ==========================================
-  // UX - LOADING E TOASTS
-  // ==========================================
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{
     show: boolean;
@@ -398,9 +372,6 @@ export function Dashboard() {
     }, 3000);
   };
 
-  // ==========================================
-  // ESTADOS RESTANTES
-  // ==========================================
   const [perfilUsuario, setPerfilUsuario] = useState({
     fullName: "",
     email: "",
@@ -428,6 +399,10 @@ export function Dashboard() {
   const [formaPagamento, setFormaPagamento] = useState<string>("PIX");
   const [menuCartaoAberto, setMenuCartaoAberto] = useState(false);
   const menuCartaoRef = useRef<HTMLDivElement>(null);
+
+  const [parcelas, setParcelas] = useState<number>(1);
+  const [isCustomParcela, setIsCustomParcela] = useState(false);
+  const [parcelasInput, setParcelasInput] = useState("");
 
   const [isDataPickerOpen, setIsDataPickerOpen] = useState(false);
   const dataPickerRef = useRef<HTMLDivElement>(null);
@@ -464,14 +439,13 @@ export function Dashboard() {
   const [novoCartaoFinal, setNovoCartaoFinal] = useState("");
   const [novoCartaoLimite, setNovoCartaoLimite] = useState("");
   const [novoCartaoCor, setNovoCartaoCor] = useState("#8A05BE");
+  const [novoCartaoFechamento, setNovoCartaoFechamento] = useState("");
+  const [novoCartaoVencimento, setNovoCartaoVencimento] = useState("");
+  const [novoCartaoBandeira, setNovoCartaoBandeira] = useState("mastercard");
 
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
-
-  // ==========================================
-  // EFEITOS E FUNÇÕES
-  // ==========================================
 
   useEffect(() => {
     document.body.style.backgroundColor = theme.bgMain;
@@ -545,6 +519,17 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoTransacaoSelecionado]);
 
+  useEffect(() => {
+    if (
+      formaPagamento === "PIX" ||
+      formaPagamento === "ACCOUNT" ||
+      formaPagamento === "BALANCE"
+    ) {
+      setParcelas(1);
+      setIsCustomParcela(false);
+    }
+  }, [formaPagamento]);
+
   const handleMudarSenha = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -571,7 +556,7 @@ export function Dashboard() {
       setIsLoading(true);
       const token = localStorage.getItem("token");
       await axios.put(
-        "https://localhost:8080",
+        `${BASE_URL}/api/v1/auth/password`,
         { currentPassword: senhaAtual, newPassword: novaSenha },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -599,19 +584,13 @@ export function Dashboard() {
     if (!token) return navigate("/");
     try {
       const [resSaldo, resTrans, resPerfil] = await Promise.all([
-        axios.get(
-          "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions/balance",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        ),
-        axios.get(
-          "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        ),
-        axios.get("https://globalwallet-api-9ffu.onrender.com/api/v1/auth/me", {
+        axios.get(`${BASE_URL}/api/v1/transactions/balance`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${BASE_URL}/api/v1/transactions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${BASE_URL}/api/v1/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -683,24 +662,40 @@ export function Dashboard() {
         formaPagamento !== "BALANCE";
 
       setIsLoading(true);
-      await axios.post(
-        "https://globalwallet-api-9ffu.onrender.com/api/v1/transactions",
-        {
-          description:
-            novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1),
-          amount: valorParaSalvar,
-          transactionDate: dataTransacao,
-          type: tipoTransacaoSelecionado,
-          category: categoriaSelecionada,
-          cardId: isCard ? Number(formaPagamento) : null,
-          paymentMethod: isCard ? "CARD" : formaPagamento,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const url = `${BASE_URL}/api/v1/transactions`;
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const descCapitalized =
+        novaDescricao.charAt(0).toUpperCase() + novaDescricao.slice(1);
+
+      let finalDescription = descCapitalized;
+      if (isCard && tipoTransacaoSelecionado === "EXPENSE") {
+        if (parcelas > 1) {
+          finalDescription = `${descCapitalized} (${parcelas}x)`;
+        } else {
+          finalDescription = `${descCapitalized} (${t.inCash || "À vista"})`;
+        }
+      }
+
+      const payload = {
+        description: finalDescription,
+        amount: valorParaSalvar,
+        transactionDate: dataTransacao,
+        type: tipoTransacaoSelecionado,
+        category: categoriaSelecionada,
+        cardId: isCard ? Number(formaPagamento) : null,
+        paymentMethod: isCard ? "CARD" : formaPagamento,
+      };
+
+      await axios.post(url, payload, config);
+
       setNovaDescricao("");
       setNovoValor("");
       setFormaPagamento("PIX");
       setDataTransacao(obterDataAtualLocal());
+      setParcelas(1);
+      setIsCustomParcela(false);
+      setParcelasInput("");
+
       await buscarTudo();
       await buscarCartoes();
       showToast("Transação registrada com sucesso!", "success");
@@ -716,12 +711,9 @@ export function Dashboard() {
     if (!id || !window.confirm(t.confirmDelete)) return;
     try {
       setIsLoading(true);
-      await axios.delete(
-        `https://globalwallet-api-9ffu.onrender.com/api/v1/transactions/${id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      );
+      await axios.delete(`${BASE_URL}/api/v1/transactions/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       await buscarTudo();
       await buscarCartoes();
       showToast("Transação excluída!", "success");
@@ -753,9 +745,97 @@ export function Dashboard() {
     }
   };
 
-  const transacoesFiltradas = transacoes.filter((t) => {
-    if (!t.transactionDate) return false;
-    const [anoStr, mesStr, diaStr] = t.transactionDate.split("-");
+  const getInvoicePeriod = (dateStr: string, closingDay: number) => {
+    const [yStr, mStr, dStr] = dateStr.split("T")[0].split("-");
+    let month = parseInt(mStr, 10);
+    let year = parseInt(yStr, 10);
+    const day = parseInt(dStr, 10);
+
+    if (day > closingDay) {
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+    }
+
+    return { month, year };
+  };
+
+  // ==========================================
+  // LÓGICA DE EXPANSAO DE PARCELAS PARA EXTRATO
+  // ==========================================
+  const expandInstallments = (txList: Transacao[]) => {
+    const expanded: Transacao[] = [];
+
+    txList.forEach((tx) => {
+      if (tx.type === "EXPENSE" && tx.card && tx.description) {
+        // Encontra a tag (Nx) na descrição
+        const match = tx.description.match(/(.+?)\s*\((\d+)x\)$/);
+        if (match) {
+          const baseDesc = match[1].trim();
+          const parcelas = parseInt(match[2], 10);
+
+          if (parcelas > 1 && tx.amount) {
+            const valorParcela = parseFloat((tx.amount / parcelas).toFixed(2));
+            const diferencaCentavos = parseFloat(
+              (tx.amount - valorParcela * (parcelas - 1)).toFixed(2),
+            );
+
+            const dataStr = tx.transactionDate || obterDataAtualLocal();
+            const [anoStr, mesStr, diaStr] = dataStr.split("T")[0].split("-");
+            const anoBase = parseInt(anoStr, 10);
+            const mesBase = parseInt(mesStr, 10);
+            const diaBase = parseInt(diaStr, 10);
+
+            // Cria as cópias para jogar para os próximos meses
+            for (let i = 1; i <= parcelas; i++) {
+              const dateOfInst = new Date(
+                anoBase,
+                mesBase - 1 + (i - 1),
+                diaBase,
+              );
+              const y = dateOfInst.getFullYear();
+              const m = String(dateOfInst.getMonth() + 1).padStart(2, "0");
+              const d = String(dateOfInst.getDate()).padStart(2, "0");
+
+              expanded.push({
+                ...tx,
+                // Mantém o ID original para que o botão de exclusão exclua toda a compra
+                description: `${baseDesc} (${i}/${parcelas})`,
+                amount: i === parcelas ? diferencaCentavos : valorParcela,
+                transactionDate: `${y}-${m}-${d}`,
+              });
+            }
+            return; // Ignora o push da transação base agrupada
+          }
+        }
+      }
+      // Se não for parcelado no cartão, adiciona normalmente
+      expanded.push(tx);
+    });
+
+    return expanded;
+  };
+
+  const transacoesExpandidas = expandInstallments(transacoes);
+
+  const transacoesFiltradas = transacoesExpandidas.filter((t_row) => {
+    if (!t_row.transactionDate) return false;
+
+    const [anoStr, mesStr, diaStr] = t_row.transactionDate.split("-");
+
+    if (t_row.card && t_row.type === "EXPENSE") {
+      const closingDay = t_row.card.closingDate || 31;
+      const period = getInvoicePeriod(t_row.transactionDate, closingDay);
+
+      const periodMatch =
+        period.month === mesFiltro && period.year === anoFiltro;
+      const diaMatch = diaFiltro === null || parseInt(diaStr, 10) === diaFiltro;
+
+      return periodMatch && diaMatch;
+    }
+
     const anoMatch = parseInt(anoStr, 10) === anoFiltro;
     const mesMatch = parseInt(mesStr, 10) === mesFiltro;
     const diaMatch = diaFiltro === null || parseInt(diaStr, 10) === diaFiltro;
@@ -772,11 +852,7 @@ export function Dashboard() {
 
   const saldoMes = totalEntradasMes - totalSaidasMes;
 
-  // ==========================================
-  // LÓGICA DE ORDENAÇÃO DE FORMAS DE PAGAMENTO
-  // ==========================================
   const getPaymentOptions = () => {
-    // 1. Array só de Cartões (para colocar em ordem alfabética)
     const cardOptions: Array<{
       type: "CARD";
       id: string;
@@ -793,11 +869,9 @@ export function Dashboard() {
           card: c,
         });
       });
-      // Ordena os cartões por ordem alfabética
       cardOptions.sort((a, b) => a.label.localeCompare(b.label, idioma));
     }
 
-    // 2. Array das Opções Fixas (Cravadas no final em ordem P, S, T)
     const fixedOptions: Array<{
       type: "PIX" | "ACCOUNT" | "BALANCE";
       id: string;
@@ -820,7 +894,6 @@ export function Dashboard() {
       label: t.transferLabel || "Transferência",
     });
 
-    // Concatena os cartões (alfabéticos) e coloca os fixos sempre em baixo
     return [...cardOptions, ...fixedOptions];
   };
 
@@ -836,7 +909,6 @@ export function Dashboard() {
       transactions: Transacao[];
     }> = [];
 
-    // 1. Adiciona os Cartões (Ordenados Alfabeticamente)
     const cartoesOrdenados = [...cartoes].sort((a, b) => {
       const nomeA = a.nome || a.name || "";
       const nomeB = b.nome || b.name || "";
@@ -847,7 +919,7 @@ export function Dashboard() {
       groupsList.push({
         id: `card-${c.id}`,
         title: c.nome || c.name || "Cartão",
-        subtitle: `**** ${c.lastDigits}`,
+        subtitle: c.lastDigits,
         icon: "💳",
         color: "#fff",
         bgColor: c.color || c.cor || "#333",
@@ -856,11 +928,10 @@ export function Dashboard() {
       });
     });
 
-    // 2. Adiciona as opções fixas (Sempre no final: Pix, Saldo em Conta, Transferência)
     groupsList.push({
       id: "pix",
       title: "Pix",
-      subtitle: "Transferência",
+      subtitle: t.pixSubtitle || "Transferência",
       icon: "⚡",
       color: "#fff",
       bgColor: "#32bcad",
@@ -871,7 +942,7 @@ export function Dashboard() {
     groupsList.push({
       id: "balance",
       title: t.balanceOption || "Saldo em Conta",
-      subtitle: "Débito direto",
+      subtitle: t.directDebit || "Débito direto",
       icon: "💰",
       color: "#fff",
       bgColor: "#827717",
@@ -882,7 +953,7 @@ export function Dashboard() {
     groupsList.push({
       id: "account",
       title: t.transferLabel || "Transferência",
-      subtitle: "TED/DOC",
+      subtitle: t.tedDoc || "TED/DOC",
       icon: "🏦",
       color: "#fff",
       bgColor: "#0277bd",
@@ -890,7 +961,6 @@ export function Dashboard() {
       transactions: [],
     });
 
-    // 3. Distribui as transações
     transacoesFiltradas.forEach((t_row) => {
       let keyId = "";
       if (t_row.card) {
@@ -918,10 +988,9 @@ export function Dashboard() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const resposta = await axios.get(
-        "https://globalwallet-api-9ffu.onrender.com/api/v1/cards",
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const resposta = await axios.get(`${BASE_URL}/api/v1/cards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setCartoes(resposta.data);
     } catch (erro) {
       console.error("Erro ao buscar cartões:", erro);
@@ -933,12 +1002,9 @@ export function Dashboard() {
     const token = localStorage.getItem("token");
     try {
       setIsLoading(true);
-      await axios.delete(
-        `https://globalwallet-api-9ffu.onrender.com/api/v1/cards/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axios.delete(`${BASE_URL}/api/v1/cards/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       await buscarCartoes();
       showToast("Cartão excluído com sucesso!", "success");
     } catch (erro) {
@@ -951,34 +1017,51 @@ export function Dashboard() {
 
   const handleAddCartao = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!novoCartaoNome || !novoCartaoFinal || !novoCartaoLimite) return;
+    if (
+      !novoCartaoNome ||
+      !novoCartaoFinal ||
+      !novoCartaoLimite ||
+      !novoCartaoFechamento ||
+      !novoCartaoVencimento
+    )
+      return;
+
     const limiteNumerico = parseFloat(
       novoCartaoLimite.replace(/[^0-9.,]/g, "").replace(",", "."),
     );
+
     if (isNaN(limiteNumerico)) {
       showToast(t.errorValue, "error");
       return;
     }
+
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
       setIsLoading(true);
       await axios.post(
-        "https://globalwallet-api-9ffu.onrender.com/api/v1/cards",
+        `${BASE_URL}/api/v1/cards`,
         {
           name: novoCartaoNome,
           lastDigits: novoCartaoFinal,
           totalLimit: limiteNumerico,
           color: novoCartaoCor,
+          closingDate: Number(novoCartaoFechamento),
+          dueDate: Number(novoCartaoVencimento),
+          flag: novoCartaoBandeira,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
+
       setIsCardModalOpen(false);
       setNovoCartaoNome("");
       setNovoCartaoFinal("");
       setNovoCartaoLimite("");
       setNovoCartaoCor("#8A05BE");
+      setNovoCartaoFechamento("");
+      setNovoCartaoVencimento("");
+      setNovoCartaoBandeira("mastercard");
       await buscarCartoes();
       showToast("Cartão adicionado com sucesso!", "success");
     } catch (erro) {
@@ -989,9 +1072,6 @@ export function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FUNÇÕES AUXILIARES
-  // ==========================================
   const getCategoriasDisponiveis = () => {
     const catKeys =
       tipoTransacaoSelecionado === "INCOME"
@@ -1003,6 +1083,9 @@ export function Dashboard() {
             "MARKET",
             "TRANSPORT",
             "INVESTMENTS",
+            "SUBSCRIPTION",
+            "TELEPHONY",
+            "DRINK",
           ];
 
     catKeys.sort((a, b) =>
@@ -1108,6 +1191,11 @@ export function Dashboard() {
   );
   const opcoesPagamento = getPaymentOptions();
 
+  const isFormaPagamentoCartao =
+    formaPagamento !== "PIX" &&
+    formaPagamento !== "ACCOUNT" &&
+    formaPagamento !== "BALANCE";
+
   const AppLogo = ({ size = 45 }: { size?: number }) => (
     <div
       style={{
@@ -1183,9 +1271,6 @@ export function Dashboard() {
   const catSelecionadaData =
     categoryMap[categoriaSelecionada] || categoryMap["OTHER"];
 
-  // ==========================================
-  // RENDERIZAÇÃO PRINCIPAL (JSX)
-  // ==========================================
   return (
     <div
       style={{
@@ -1199,6 +1284,16 @@ export function Dashboard() {
       <style>{`
         @keyframes slideUpToast { from { bottom: -50px; opacity: 0; } to { bottom: 30px; opacity: 1; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Ocultar setas em inputs number */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
       `}</style>
 
       {toast.show && (
@@ -1975,7 +2070,12 @@ export function Dashboard() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gridTemplateColumns:
+                        isMobile ||
+                        !isFormaPagamentoCartao ||
+                        tipoTransacaoSelecionado !== "EXPENSE"
+                          ? "1fr"
+                          : "1fr 1fr 1fr",
                       gap: "15px",
                       alignItems: "flex-end",
                     }}
@@ -2249,6 +2349,120 @@ export function Dashboard() {
                         </div>
                       )}
                     </div>
+
+                    {isFormaPagamentoCartao &&
+                      tipoTransacaoSelecionado === "EXPENSE" && (
+                        <div>
+                          <p
+                            style={{
+                              margin: "0 0 6px 0",
+                              fontSize: "0.75rem",
+                              color: theme.textMuted,
+                              fontWeight: "600",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Parcelamento
+                          </p>
+
+                          {!isCustomParcela ? (
+                            <select
+                              value={parcelas}
+                              onChange={(e) => {
+                                if (e.target.value === "custom") {
+                                  setIsCustomParcela(true);
+                                  setParcelasInput("");
+                                } else {
+                                  setParcelas(Number(e.target.value));
+                                }
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "10px 14px",
+                                borderRadius: "10px",
+                                border: `1px solid ${theme.border}`,
+                                backgroundColor: theme.inputBg,
+                                color: theme.textMain,
+                                outline: "none",
+                                fontSize: "0.9rem",
+                                boxSizing: "border-box",
+                                cursor: "pointer",
+                                WebkitAppearance: "none",
+                                MozAppearance: "none",
+                              }}
+                            >
+                              <option value={1}>{t.inCash || "À vista"}</option>
+                              {Array.from({ length: 11 }, (_, i) => i + 2).map(
+                                (num) => (
+                                  <option key={num} value={num}>
+                                    {num}x
+                                  </option>
+                                ),
+                              )}
+                              <option value="custom">Mais...</option>
+                            </select>
+                          ) : (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                              }}
+                            >
+                              <input
+                                type="number"
+                                min="1"
+                                max="120"
+                                value={parcelasInput}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setParcelasInput(val);
+                                  if (val && Number(val) > 0) {
+                                    setParcelas(Number(val));
+                                  } else {
+                                    setParcelas(1);
+                                  }
+                                }}
+                                autoFocus
+                                style={{
+                                  width: "100%",
+                                  padding: "10px 14px",
+                                  borderRadius: "10px",
+                                  border: `1px solid ${theme.border}`,
+                                  backgroundColor: theme.inputBg,
+                                  color: theme.textMain,
+                                  outline: "none",
+                                  fontSize: "0.9rem",
+                                  boxSizing: "border-box",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCustomParcela(false);
+                                  if (
+                                    !parcelasInput ||
+                                    Number(parcelasInput) < 2
+                                  )
+                                    setParcelas(1);
+                                }}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: theme.textMuted,
+                                  cursor: "pointer",
+                                  fontSize: "1.2rem",
+                                  padding: "0 5px",
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                     <div>
                       <p
                         style={{
@@ -2375,7 +2589,7 @@ export function Dashboard() {
 
                         return (
                           <tr
-                            key={t_row.id || i}
+                            key={`${t_row.id}-${i}`}
                             style={{
                               borderBottom: `1px solid ${theme.border}`,
                             }}
@@ -2539,12 +2753,12 @@ export function Dashboard() {
           </>
         )}
 
-        {/* ================= ABA 2: EXTRATO DETALHADO (ACCORDION CARDS) ================= */}
+        {/* ================= ABA 2: EXTRATO DETALHADO ================= */}
         {abaAtiva === "statement" && (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            {/* Header com as 3 caixas de resumo (Entrada, Saída, Balanço) */}
+            {/* Header com as 3 caixas de resumo */}
             <div
               style={{
                 display: "grid",
@@ -2684,7 +2898,7 @@ export function Dashboard() {
                 transition: "background-color 0.3s ease",
               }}
             >
-              {/* Título e Date Picker juntos */}
+              {/* Título e Date Picker */}
               <div
                 style={{
                   display: "flex",
@@ -2706,7 +2920,6 @@ export function Dashboard() {
                   {t.periodTransactions}
                 </h3>
 
-                {/* Filtro de Data (Mês e Dia) */}
                 <div
                   style={{
                     display: "flex",
@@ -2836,7 +3049,7 @@ export function Dashboard() {
                                       onClick={() => {
                                         setMesFiltro(index + 1);
                                         setAnoFiltro(pickerYear);
-                                        setPickerMode("day"); // Muda a tela para escolher o dia
+                                        setPickerMode("day");
                                       }}
                                       style={{
                                         padding: "10px 0",
@@ -2992,18 +3205,38 @@ export function Dashboard() {
                 const isExpanded = expandedStatementGroup === group.id;
                 const currentFilter = statementInnerFilter[group.id] || "ALL";
 
-                // Filtro interno para Pix e Transferência
+                // Filtro interno
                 const filteredGroupTxs = group.transactions.filter((tx) => {
                   if (currentFilter === "ALL") return true;
                   return tx.type === currentFilter;
                 });
 
-                // Reutilizamos a função para agrupar as transações desse card específico por dias
                 const diasAgrupados = agruparTransacoesPorDia(filteredGroupTxs);
+
+                // --- INÍCIO DA LÓGICA DE CÁLCULO DE TOTAL ---
+                const totalGastosGrupo = filteredGroupTxs
+                  .filter((t_row) => t_row.type === "EXPENSE")
+                  .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+                const totalGanhosGrupo = filteredGroupTxs
+                  .filter((t_row) => t_row.type === "INCOME")
+                  .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+                let saldoGrupo = 0;
+                if (group.isCard) {
+                  // Para cartão, os gastos aumentam a fatura (positivo)
+                  saldoGrupo = totalGastosGrupo - totalGanhosGrupo;
+                } else {
+                  // Para contas/pix, as entradas aumentam o saldo
+                  saldoGrupo = totalGanhosGrupo - totalGastosGrupo;
+                }
+
+                const exibeTotal = getValorExibicao(Math.abs(saldoGrupo));
+                const prefixoTotal = saldoGrupo < 0 ? "- " : "";
+                // --- FIM DA LÓGICA DE CÁLCULO DE TOTAL ---
 
                 return (
                   <div key={group.id} style={{ marginBottom: "1rem" }}>
-                    {/* O Card Clicável (Cabeçalho do Acordeão) */}
+                    {/* O Card Clicável */}
                     <div
                       onClick={() =>
                         setExpandedStatementGroup(isExpanded ? null : group.id)
@@ -3065,10 +3298,31 @@ export function Dashboard() {
                         }}
                       >
                         <span
-                          style={{ fontSize: "0.9rem", fontWeight: "bold" }}
+                          style={{
+                            fontSize: "0.9rem",
+                            fontWeight: "bold",
+                            opacity: 0.9,
+                          }}
                         >
                           {group.transactions.length} {t.transactionsCount}
                         </span>
+
+                        {/* --- EXIBIÇÃO DO TOTAL NO CABEÇALHO DO ACORDEÃO --- */}
+                        <span
+                          style={{
+                            fontSize: "1rem",
+                            fontWeight: "bold",
+                            backgroundColor: "rgba(255, 255, 255, 0.2)",
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                          }}
+                        >
+                          {prefixoTotal}
+                          {exibeTotal.simbolo} {exibeTotal.valorFormatado}
+                        </span>
+                        {/* -------------------------------------------------- */}
+
                         <span
                           style={{
                             transform: isExpanded ? "rotate(180deg)" : "none",
@@ -3081,7 +3335,7 @@ export function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Conteúdo Expandido (As transações do Cartão/Pix/Conta) */}
+                    {/* Conteúdo Expandido */}
                     {isExpanded && (
                       <div
                         style={{
@@ -3095,7 +3349,7 @@ export function Dashboard() {
                           paddingTop: "20px", // compensa a margem negativa
                         }}
                       >
-                        {/* Botões de Filtro Interno (Só não exibe se for cartão ou saldo em conta) */}
+                        {/* Botões de Filtro Interno */}
                         {!group.isCard && group.id !== "balance" && (
                           <div
                             style={{
@@ -3187,7 +3441,7 @@ export function Dashboard() {
                           </div>
                         )}
 
-                        {/* Lista de Transações daquele Método (Agrupada por Dias) */}
+                        {/* Lista de Transações daquele Método */}
                         {diasAgrupados.length === 0 ? (
                           <p
                             style={{
@@ -3247,7 +3501,7 @@ export function Dashboard() {
 
                                     return (
                                       <tr
-                                        key={t_row.id || i}
+                                        key={`${t_row.id}-${i}`}
                                         style={{
                                           borderBottom: `1px solid ${theme.border}`,
                                         }}
@@ -3582,11 +3836,11 @@ export function Dashboard() {
                       <p
                         style={{
                           margin: 0,
-                          fontSize: isMobile ? "1.05rem" : "1.15rem", // Fonte levemente menor
-                          letterSpacing: isMobile ? "1.5px" : "2px", // Espaçamento mais enxuto
+                          fontSize: isMobile ? "1.05rem" : "1.15rem",
+                          letterSpacing: isMobile ? "1.5px" : "2px",
                           fontFamily: "monospace",
                           textShadow: "1px 1px 2px rgba(0,0,0,0.3)",
-                          whiteSpace: "nowrap", // A MÁGICA: proíbe de pular para a linha de baixo!
+                          whiteSpace: "nowrap",
                         }}
                       >
                         **** **** **** {cartao.lastDigits}
@@ -4185,57 +4439,6 @@ export function Dashboard() {
               {t.modalCardTitle}
             </h3>
 
-            {/* PRESETS DE CARTÕES */}
-            <div style={{ marginBottom: "20px" }}>
-              <p
-                style={{
-                  margin: "0 0 10px 0",
-                  fontSize: "0.85rem",
-                  color: theme.textMuted,
-                  fontWeight: "600",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.chooseModel}
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {PRESET_CARDS.map((preset) => {
-                  const isSelected =
-                    novoCartaoNome === preset.name &&
-                    novoCartaoCor === preset.color;
-                  const displayName =
-                    preset.name === "Personalizado" ? t.custom : preset.name;
-                  return (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => {
-                        setNovoCartaoNome(
-                          preset.name === "Personalizado" ? "" : preset.name,
-                        );
-                        setNovoCartaoCor(preset.color);
-                      }}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "20px",
-                        border: `1px solid ${isSelected ? preset.color : theme.border}`,
-                        backgroundColor: isSelected
-                          ? `${preset.color}20`
-                          : theme.inputBg,
-                        color: isSelected ? preset.color : theme.textSec,
-                        fontWeight: isSelected ? "bold" : "500",
-                        fontSize: "0.8rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {displayName}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <form
               onSubmit={handleAddCartao}
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
@@ -4248,9 +4451,10 @@ export function Dashboard() {
                     color: theme.textMuted,
                     fontWeight: "600",
                     marginBottom: "5px",
+                    textTransform: "uppercase",
                   }}
                 >
-                  {t.cardName}
+                  {t.bankName || "Nome do Banco"}
                 </label>
                 <input
                   value={novoCartaoNome}
@@ -4270,6 +4474,41 @@ export function Dashboard() {
                 />
               </div>
 
+              {/* SELETOR DE BANDEIRA ADICIONADO AQUI */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    color: theme.textMuted,
+                    fontWeight: "600",
+                    marginBottom: "5px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Bandeira do Cartão
+                </label>
+                <select
+                  value={novoCartaoBandeira}
+                  onChange={(e) => setNovoCartaoBandeira(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.textMain,
+                    fontSize: "0.95rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="mastercard">Mastercard</option>
+                  <option value="visa">Visa</option>
+                </select>
+              </div>
+
               <div
                 style={{
                   display: "grid",
@@ -4285,6 +4524,7 @@ export function Dashboard() {
                       color: theme.textMuted,
                       fontWeight: "600",
                       marginBottom: "5px",
+                      textTransform: "uppercase",
                     }}
                   >
                     {t.cardEndingModal}
@@ -4317,6 +4557,7 @@ export function Dashboard() {
                       color: theme.textMuted,
                       fontWeight: "600",
                       marginBottom: "5px",
+                      textTransform: "uppercase",
                     }}
                   >
                     {t.totalLimit}
@@ -4340,6 +4581,87 @@ export function Dashboard() {
                 </div>
               </div>
 
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "15px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      color: theme.textMuted,
+                      fontWeight: "600",
+                      marginBottom: "5px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {t.closingDay || "Dia de Fechamento"}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={novoCartaoFechamento}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (Number(val) > 31) val = "31";
+                      setNovoCartaoFechamento(val);
+                    }}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: `1px solid ${theme.border}`,
+                      backgroundColor: theme.inputBg,
+                      color: theme.textMain,
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      color: theme.textMuted,
+                      fontWeight: "600",
+                      marginBottom: "5px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {t.dueDay || "Dia de Vencimento"}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={novoCartaoVencimento}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (Number(val) > 31) val = "31";
+                      setNovoCartaoVencimento(val);
+                    }}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: `1px solid ${theme.border}`,
+                      backgroundColor: theme.inputBg,
+                      color: theme.textMain,
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label
                   style={{
@@ -4347,7 +4669,8 @@ export function Dashboard() {
                     fontSize: "0.8rem",
                     color: theme.textMuted,
                     fontWeight: "600",
-                    marginBottom: "5px",
+                    marginBottom: "8px",
+                    textTransform: "uppercase",
                   }}
                 >
                   {t.cardColor}
@@ -4358,23 +4681,28 @@ export function Dashboard() {
                     gap: "12px",
                     flexWrap: "wrap",
                     backgroundColor: theme.inputBg,
-                    padding: "10px",
+                    padding: "12px",
                     borderRadius: "10px",
                     border: `1px solid ${theme.border}`,
                   }}
                 >
                   {[
-                    "#8A05BE", // Nubank
-                    "#EC7000", // Itaú
-                    "#CC092F", // Bradesco
-                    "#EC0000", // Santander
-                    "#F9D308", // BB
-                    "#005CA9", // Caixa
-                    "#FF7A00", // Inter
-                    "#242424", // C6
-                    "#000000", // XP
-                    "#107c10", // Verde genérico
-                    "#E53935", // Vermelho genérico
+                    "#8A05BE",
+                    "#EC7000",
+                    "#CC092F",
+                    "#EC0000",
+                    "#F9D308",
+                    "#005CA9",
+                    "#FF7A00",
+                    "#242424",
+                    "#000000",
+                    "#107c10",
+                    "#E53935",
+                    "#00B4D8",
+                    "#1E88E5",
+                    "#FF4081",
+                    "#00E676",
+                    "#FFC107",
                   ].map((cor) => (
                     <div
                       key={cor}
@@ -4390,7 +4718,7 @@ export function Dashboard() {
                             ? "3px solid #ccc"
                             : "2px solid transparent",
                         transform:
-                          novoCartaoCor === cor ? "scale(1.1)" : "none",
+                          novoCartaoCor === cor ? "scale(1.15)" : "none",
                         transition: "all 0.2s",
                         boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
                       }}
@@ -4502,6 +4830,10 @@ const translations = {
     paymentHistoryLabel: "Forma de Pagamento",
     receiptMethodLabel: "Forma de Recebimento",
     transferLabel: "Transferência",
+    pixSubtitle: "Transferência",
+    directDebit: "Débito direto",
+    tedDoc: "TED/DOC",
+    inCash: "À vista",
     profileTitle: "Meu Perfil",
     fullNameLabel: "Nome Completo",
     emailLabel: "E-mail",
@@ -4528,9 +4860,9 @@ const translations = {
     received: "Recebidos",
     sent: "Enviados",
     transactionsCount: "transações",
-    chooseModel: "Escolha um modelo",
-    custom: "Personalizado",
-    cardName: "Nome do Cartão",
+    bankName: "Nome do Banco",
+    closingDay: "Dia de Fechamento",
+    dueDay: "Dia de Vencimento",
     cardEndingModal: "Final (4 dígitos)",
     totalLimit: "Limite Total",
     months: [
@@ -4598,6 +4930,10 @@ const translations = {
     paymentHistoryLabel: "Payment Method",
     receiptMethodLabel: "Receipt Method",
     transferLabel: "Bank Transfer",
+    pixSubtitle: "Transfer",
+    directDebit: "Direct Debit",
+    tedDoc: "Wire Transfer",
+    inCash: "In cash",
     profileTitle: "My Profile",
     fullNameLabel: "Full Name",
     emailLabel: "E-mail",
@@ -4625,9 +4961,9 @@ const translations = {
     received: "Received",
     sent: "Sent",
     transactionsCount: "transactions",
-    chooseModel: "Choose a preset",
-    custom: "Custom",
-    cardName: "Card Name",
+    bankName: "Bank Name",
+    closingDay: "Closing Day",
+    dueDay: "Due Day",
     cardEndingModal: "Ending (4 digits)",
     totalLimit: "Total Limit",
     months: [
@@ -4695,6 +5031,10 @@ const translations = {
     paymentHistoryLabel: "Método de Pago",
     receiptMethodLabel: "Forma de Cobro",
     transferLabel: "Transferencia",
+    pixSubtitle: "Transferencia",
+    directDebit: "Débito directo",
+    tedDoc: "Transferencia",
+    inCash: "Al contado",
     profileTitle: "Mi Perfil",
     fullNameLabel: "Nombre Completo",
     emailLabel: "Correo",
@@ -4721,9 +5061,9 @@ const translations = {
     received: "Recibidos",
     sent: "Enviados",
     transactionsCount: "transacciones",
-    chooseModel: "Elige un modelo",
-    custom: "Personalizado",
-    cardName: "Nombre de la Tarjeta",
+    bankName: "Nombre del Banco",
+    closingDay: "Día de Cierre",
+    dueDay: "Día de Vencimiento",
     cardEndingModal: "Termina en (4 dígitos)",
     totalLimit: "Límite Total",
     months: [
@@ -4791,6 +5131,10 @@ const translations = {
     paymentHistoryLabel: "Méthode de Paiement",
     receiptMethodLabel: "Méthode d'Encaissement",
     transferLabel: "Virement",
+    pixSubtitle: "Transfert",
+    directDebit: "Prélèvement",
+    tedDoc: "Virement",
+    inCash: "Comptant",
     profileTitle: "Mon Profil",
     fullNameLabel: "Nom Complet",
     emailLabel: "E-mail",
@@ -4818,9 +5162,9 @@ const translations = {
     received: "Reçus",
     sent: "Envoyés",
     transactionsCount: "transactions",
-    chooseModel: "Choisissez un modèle",
-    custom: "Personnalisé",
-    cardName: "Nom de la Carte",
+    bankName: "Nom de la Banque",
+    closingDay: "Jour de Clôture",
+    dueDay: "Jour d'Échéance",
     cardEndingModal: "Se termine par (4 chiffres)",
     totalLimit: "Limite Totale",
     months: [
@@ -4833,7 +5177,7 @@ const translations = {
       "Juillet",
       "Août",
       "Septembre",
-      "Octobre",
+      "Octubre",
       "Novembro",
       "Décembre",
     ],
@@ -4888,6 +5232,10 @@ const translations = {
     paymentHistoryLabel: "Zahlungsmethode",
     receiptMethodLabel: "Empfangsmethode",
     transferLabel: "Überweisung",
+    pixSubtitle: "Überweisung",
+    directDebit: "Lastschrift",
+    tedDoc: "Banküberweisung",
+    inCash: "Barzahlung",
     profileTitle: "Mein Profil",
     fullNameLabel: "Vollständiger Name",
     emailLabel: "E-Mail",
@@ -4915,9 +5263,9 @@ const translations = {
     received: "Erhalten",
     sent: "Gesendet",
     transactionsCount: "Transaktionen",
-    chooseModel: "Wählen Sie eine Vorlage",
-    custom: "Benutzerdefiniert",
-    cardName: "Kartenname",
+    bankName: "Bankname",
+    closingDay: "Abrechnungstag",
+    dueDay: "Fälligkeitstag",
     cardEndingModal: "Endet mit (4 Ziffern)",
     totalLimit: "Gesamtlimit",
     months: [
@@ -4961,21 +5309,21 @@ const categoryMap: Record<
     bgColor: "#e8f5e9",
   },
   SALES: {
-    pt: "Vendas",
-    en: "Sales",
-    es: "Ventas",
-    fr: "Ventes",
-    de: "Verkäufe",
+    pt: "Venda",
+    en: "Sale",
+    es: "Venta",
+    fr: "Vente",
+    de: "Verkauf",
     emoji: "🛍️",
     color: "#0277bd",
     bgColor: "#e3f2fd",
   },
   INVESTMENTS: {
-    pt: "Investimentos",
-    en: "Investments",
-    es: "Inversiones",
-    fr: "Investissements",
-    de: "Investitionen",
+    pt: "Investimento",
+    en: "Investment",
+    es: "Inversión",
+    fr: "Investissement",
+    de: "Investition",
     emoji: "📈",
     color: "#fbc02d",
     bgColor: "#fffde7",
@@ -5006,7 +5354,7 @@ const categoryMap: Record<
     es: "Transporte",
     fr: "Transport",
     de: "Transport",
-    emoji: "🚌",
+    emoji: "🚙",
     color: "#1565c0",
     bgColor: "#e3f2fd",
   },
@@ -5014,27 +5362,57 @@ const categoryMap: Record<
     pt: "Lazer",
     en: "Entertainment",
     es: "Entretenimiento",
-    fr: "Loisirs",
+    fr: "Loisir",
     de: "Freizeit",
     emoji: "🍿",
     color: "#6a1b9a",
     bgColor: "#f3e5f5",
   },
   BILLS: {
-    pt: "Contas",
-    en: "Bills",
-    es: "Cuentas",
-    fr: "Factures",
-    de: "Rechnungen",
+    pt: "Conta",
+    en: "Bill",
+    es: "Cuenta",
+    fr: "Facture",
+    de: "Rechnung",
     emoji: "📄",
     color: "#00695c",
     bgColor: "#e0f2f1",
+  },
+  SUBSCRIPTION: {
+    pt: "Assinatura",
+    en: "Subscription",
+    es: "Suscripción",
+    fr: "Abonnement",
+    de: "Abonnement",
+    emoji: "📱",
+    color: "#00838f",
+    bgColor: "#e0f2f1",
+  },
+  TELEPHONY: {
+    pt: "Telefonia",
+    en: "Telephony",
+    es: "Telefonía",
+    fr: "Téléphonie",
+    de: "Telefonie",
+    emoji: "📞",
+    color: "#283593",
+    bgColor: "#e8eaf6",
+  },
+  DRINK: {
+    pt: "Bebida",
+    en: "Drink",
+    es: "Bebida",
+    fr: "Boisson",
+    de: "Getränk",
+    emoji: "🥤",
+    color: "#c62828",
+    bgColor: "#ffebee",
   },
   OTHER: {
     pt: "Outros",
     en: "Other",
     es: "Otros",
-    fr: "Autres",
+    fr: "Autre",
     de: "Andere",
     emoji: "📌",
     color: "#616161",
