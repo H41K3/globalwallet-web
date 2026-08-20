@@ -4,7 +4,7 @@ import axios from "axios";
 
 import bgImg from "../assets/loginbackground.png";
 
-type IdiomaType = "pt" | "en" | "es" | "fr" | "de";
+type IdiomaType = "pt" | "en" | "es";
 
 const AppLogo = ({ size = 45 }: { size?: number }) => (
   <div
@@ -204,11 +204,11 @@ export function Login() {
                 borderRadius: "12px",
                 boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
                 padding: "10px",
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
                 zIndex: 1001,
-                minWidth: "220px",
+                minWidth: "150px",
               }}
             >
               {idiomasOrdenados.map((lang) => (
@@ -430,8 +430,6 @@ const translations = {
       pt: "Português",
       en: "Inglês",
       es: "Espanhol",
-      fr: "Francês",
-      de: "Alemão",
     },
     title: "GlobalWallet",
     cpfLabel: "CPF",
@@ -447,8 +445,6 @@ const translations = {
       pt: "Portuguese",
       en: "English",
       es: "Spanish",
-      fr: "French",
-      de: "German",
     },
     title: "GlobalWallet",
     cpfLabel: "ID / CPF",
@@ -464,8 +460,6 @@ const translations = {
       pt: "Portugués",
       en: "Inglés",
       es: "Español",
-      fr: "Francés",
-      de: "Alemán",
     },
     title: "GlobalWallet",
     cpfLabel: "Identificación / CPF",
@@ -474,39 +468,5 @@ const translations = {
     noAccount: "¿No tienes una cuenta?",
     registerLink: "Regístrate",
     errorInvalid: "Identificación o contraseña no válidos.",
-  },
-  fr: {
-    flag: "🇫🇷",
-    langs: {
-      pt: "Portugais",
-      en: "Anglais",
-      es: "Espagnol",
-      fr: "Français",
-      de: "Allemand",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "ID / CPF",
-    passwordLabel: "Mot de passe",
-    loginBtn: "Se connecter",
-    noAccount: "Vous n'avez pas de compte?",
-    registerLink: "S'inscrire",
-    errorInvalid: "ID ou mot de passe invalide.",
-  },
-  de: {
-    flag: "🇩🇪",
-    langs: {
-      pt: "Portugiesisch",
-      en: "Englisch",
-      es: "Spanisch",
-      fr: "Französisch",
-      de: "Deutsch",
-    },
-    title: "GlobalWallet",
-    cpfLabel: "Ausweis / CPF",
-    passwordLabel: "Passwort",
-    loginBtn: "Anmelden",
-    noAccount: "Haben Sie kein Konto?",
-    registerLink: "Registrieren",
-    errorInvalid: "Ungültige ID oder Passwort.",
   },
 };
